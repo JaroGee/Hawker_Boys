@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from functools import lru_cache
-from pydantic import BaseSettings, Field, AnyUrl
+
+from pydantic import AnyUrl, Field
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
