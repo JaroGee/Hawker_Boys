@@ -1,56 +1,44 @@
 from __future__ import annotations
 
-from datetime import date, datetime
-from typing import Optional
-
-from pydantic import BaseModel, Field
+from dataclasses import dataclass
+from typing import Any
 
 
-class SSGTokenResponse(BaseModel):
+@dataclass
+class SSGAuthToken:
     access_token: str
     token_type: str
     expires_in: int
 
 
-class CoursePayload(BaseModel):
-    courseCode: str
-    courseTitle: str
-    description: Optional[str] = None
-    publishFlag: bool = False
+@dataclass
+class SSGError:
+    code: str
+    message: str
+    details: Any | None = None
 
 
-class CourseRunPayload(BaseModel):
-    courseRunCode: str
-    courseCode: str
-    startDate: date
-    endDate: date
-    capacity: int
-    location: Optional[str] = None
+@dataclass
+class SSGCoursePayload:
+    course_code: str
+    title: str
+    description: str | None
+    status: str
 
 
-class LearnerPayload(BaseModel):
-    learnerIdentifier: str
-    learnerName: str
-    contactNumber: Optional[str] = None
-    email: Optional[str] = None
+@dataclass
+class SSGClassRunPayload:
+    course_code: str
+    run_id: str | None
+    reference_code: str
+    start_date: str
+    end_date: str
+    status: str
 
 
-class EnrollmentPayload(BaseModel):
-    courseRunCode: str
-    learnerIdentifier: str
-    enrollmentStatus: str
-
-
-class AttendancePayload(BaseModel):
-    courseRunCode: str
-    sessionDate: date
-    sessionStartTime: datetime
-    sessionEndTime: datetime
-    learnerIdentifier: str
-    attendanceStatus: str
-
-
-class ClaimPayload(BaseModel):
-    courseRunCode: str
-    totalClaimAmount: float = Field(ge=0)
-    supportingDocumentUrl: Optional[str] = None
+@dataclass
+class SSGAttendancePayload:
+    run_id: str
+    session_date: str
+    learner_identifier: str
+    status: str

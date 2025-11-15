@@ -1,48 +1,60 @@
-# Security and PDPA Controls
+# Security and PDPA Playbook
 
-## Data Protection Principles
-- Collect only data mandated by SSG or essential for training operations.
-- Hash NRIC-equivalent identifiers before storage using SHA-256 with salt.
-- Mask sensitive fields in UI and restrict exports to authorised roles.
+## 1. Data Classification
+- **Restricted**: Learner personal data, attendance, assessments.
+- **Confidential**: Trainer profiles, course content, audit logs.
+- **Internal**: System metrics, job queue stats.
 
-## Encryption
-- Enforce HTTPS for all external traffic (managed by hosting provider).
-- Use platform encryption at rest (Railway, Render, Lightsail volumes) plus PostgreSQL encryption options where available.
+## 2. Access Control
+- JWT tokens issued via `/api/v1/auth/token` with 30-minute access lifespan and refresh via re-authentication.
+- Roles:
+  - **Admin**: full access, manage users and security settings.
+  - **Ops**: manage courses, runs, enrollments, certificates.
+  - **Trainer**: manage attendance and assessments for assigned sessions.
+  - **Learner**: read-only profile access (future portal).
+- Enforce principle of least privilege by assigning the lowest viable role.
 
-## Access Control
-- Role-based access control: Admin, Ops, Trainer, Learner.
-- Administrative actions require `admin` role; attendance updates limited to trainer/ops.
-- Audit trail stored in `audit_trails` table with timestamps and actor metadata.
+## 3. Data Protection
+- **Transport**: All public endpoints must sit behind HTTPS (enforce via hosting platform or ingress).
+- **At Rest**: Use platform encryption (Render, Railway, Lightsail support). Enable disk encryption if self-managing infrastructure.
+- **Field Level**: Store only masked NRIC (e.g., `S1234567*`). If full NRIC capture is mandated temporarily, encrypt with AES-256 and rotate keys quarterly.
 
-## Logging & Monitoring
-- Structured logging with correlation IDs for SSG calls.
-- Recommend forwarding logs to hosted ELK or CloudWatch.
-- Enable Sentry (or similar) for exception tracking.
+## 4. Audit and Monitoring
+- Every create/update/delete/access of sensitive entities records an `AuditTrail` entry with actor, entity, timestamp.
+- Logs include request IDs and SSG correlation IDs (extend Loguru configuration if needed).
+- Integrate Sentry or equivalent via `SENTRY_DSN` for error aggregation.
 
-## Data Retention
-- Active learner records retained for 5 years post-course completion.
-- Archived records encrypted and purged annually.
-- Provide deletion workflow for subject requests within 30 days.
+## 5. Data Retention
+- Learner profiles: retain for 5 years after last class to satisfy SSG audit requirements.
+- Attendance and assessments: retain for 6 years aligned with PDPA accountability.
+- Audit trails: retain for 7 years for incident reconstruction.
+- Provide anonymisation or deletion capability upon learner request once statutory period lapses.
 
-## Incident Response
-1. Detect anomaly via monitoring alert.
-2. Contain by revoking compromised credentials and isolating impacted systems.
-3. Assess scope, document evidence, notify stakeholders within 72 hours as per PDPA.
-4. Recover from backups and strengthen controls.
+## 6. Incident Response
+1. Contain: Disable affected user accounts, revoke tokens, isolate compromised services.
+2. Assess: Review audit logs, identify scope of data exposure.
+3. Notify: Inform management and, if PDPA breach thresholds met, notify PDPC and impacted learners within 72 hours.
+4. Eradicate: Patch vulnerabilities, rotate secrets, increase monitoring.
+5. Recover: Restore services from clean backups, monitor for recurrence.
+6. Lessons Learned: Document post-mortem and update training.
 
-## Key Rotation
-- Store secrets in platform key vault (Railway variables, AWS Secrets Manager).
-- Rotate `SECRET_KEY`, `SSG_CLIENT_SECRET`, DB credentials at least twice a year.
-- Update `.env` or platform configuration followed by service restart.
+## 7. Backup and Restore
+- Nightly `pg_dump` stored on encrypted storage.
+- Test restore monthly using `pg_restore` into staging instance.
+- Back up `.env` and secrets using secret manager exports (never commit to git).
 
-## Preflight Checklist
-Run `make preflight` before deployments to ensure environment integrity.
+## 8. Key Management
+- Store secrets in platform secret stores (Render secrets, Railway variables, AWS Parameter Store).
+- Rotate JWT secret, SSG credentials, and database passwords at least every 6 months or upon staff turnover.
+- Document rotation steps in ops runbook and require two-person approval for production rotations.
 
-## Backup & Restore
-- Nightly `pg_dump -Fc` to secure storage (S3 with lifecycle policies).
-- Quarterly restore test using `pg_restore` to staging environment.
+## 9. Red-Teaming Quick Wins
+- Rate limit authentication (e.g., 5 attempts per minute per IP) - integrate with FastAPI middleware or gateway.
+- Validate all incoming data using Pydantic schemas; reject invalid NRIC formats.
+- Enable CSRF protection if server-rendered forms are introduced.
+- Conduct quarterly dependency audit using `pip-audit` and `npm audit --production`.
 
-## Red Team Quick Wins
-- Input validation enforced via Pydantic schemas.
-- Rate limiting recommended for auth endpoints (e.g., 5 attempts per minute via proxy).
-- CSRF protection required if server-rendered forms introduced.
+## 10. PDPA Rights Handling
+- **Access Requests**: Export learner data from database within 30 days, redact other learners' details.
+- **Correction Requests**: Update records via admin UI/API and log adjustments in audit trail.
+- **Withdrawal of Consent**: Explain statutory retention obligations, document response.

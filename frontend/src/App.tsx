@@ -1,46 +1,28 @@
-import { useEffect, useState } from "react";
-import axios from "axios";
+import { Routes, Route, Navigate, Link } from 'react-router-dom';
+import Dashboard from './pages/Dashboard';
+import SyncStatus from './pages/SyncStatus';
 
-type Course = {
-  id: string;
-  code: string;
-  title: string;
-};
-
-function App() {
-  const [courses, setCourses] = useState<Course[]>([]);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    axios
-      .get<Course[]>("/api/v1/courses", { headers: { "X-Role": "ops" } })
-      .then((res) => setCourses(res.data))
-      .catch(() =>
-        setError("We could not load courses right now. Refresh the page or confirm the backend is running. Contact ops support if it keeps happening.")
-      );
-  }, []);
-
+const App = () => {
   return (
-    <main style={{ margin: "2rem", fontFamily: "system-ui" }}>
-      <h1>Hawker Boys TMS</h1>
-      <p>Manage courses, class runs, and SSG sync from this lightweight console.</p>
-      {error && <div style={{ color: "#c00", fontWeight: 600 }}>{error}</div>}
-      <section>
-        <h2>Courses</h2>
-        {courses.length === 0 ? (
-          <p>No courses yet. Create one via the API or seed script.</p>
-        ) : (
+    <div className="app-shell">
+      <aside className="sidebar">
+        <h1>Hawker Boys TMS</h1>
+        <nav>
           <ul>
-            {courses.map((course) => (
-              <li key={course.id}>
-                <strong>{course.title}</strong> <span>({course.code})</span>
-              </li>
-            ))}
+            <li><Link to="/">Dashboard</Link></li>
+            <li><Link to="/sync-status">SSG Sync Status</Link></li>
           </ul>
-        )}
-      </section>
-    </main>
+        </nav>
+      </aside>
+      <main className="main-content">
+        <Routes>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/sync-status" element={<SyncStatus />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </main>
+    </div>
   );
-}
+};
 
 export default App;

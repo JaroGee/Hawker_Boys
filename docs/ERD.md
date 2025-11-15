@@ -1,45 +1,70 @@
-# Entity Relationship Overview
+# Data Model and Integration Flows
 
+## Entity Relationship Overview
+```mermaid
+erDiagram
+    COURSE ||--o{ MODULE : contains
+    COURSE ||--o{ CLASS_RUN : offers
+    CLASS_RUN ||--o{ SESSION : schedules
+    CLASS_RUN ||--o{ ENROLLMENT : includes
+    SESSION ||--o{ ATTENDANCE : records
+    ENROLLMENT ||--o{ ASSESSMENT : evaluates
+    ENROLLMENT ||--|| CERTIFICATE : awards
+    USER ||--o| LEARNER : profile
+    USER ||--o| TRAINER : profile
+    TRAINER ||--o{ SESSION : leads
+    ENROLLMENT }o--|| LEARNER : belongs
+    AUDIT_TRAIL }|--|| USER : actor
 ```
-Course 1---n CourseModule
-Course 1---n ClassRun 1---n Session
-ClassRun n---n Learner (via Enrollment)
-Enrollment 1---n Attendance
-Enrollment 1---n Assessment 1---1 Certificate
-Session n---n Trainer (via SessionTrainer)
+
+- **Course** holds reusable module templates and high-level SSG course code.
+- **ClassRun** references a course and captures run-specific metadata (start/end, status, SSG run ID).
+- **Session** tracks session-level attendance and trainer assignments.
+- **Learner** stores masked identifiers and contact details linked to optional user accounts for portal access.
+- **Enrollment** links learners to class runs with status and SSG sync keys.
+- **Attendance**, **Assessment**, and **Certificate** hang off enrollments for compliance artefacts.
+- **AuditTrail** records sensitive CRUD and access events for PDPA traceability.
+
+## SSG Sync Flows
+
+### A. Course Creation and Publish
+```mermaid
+sequenceDiagram
+    participant Ops
+    participant API as TMS API
+    participant Queue as RQ Queue
+    participant Worker
+    participant SSG as SSG API
+
+    Ops->>API: POST /api/v1/courses
+    API->>Queue: enqueue sync_course_to_ssg(course_id)
+    Queue-->>Worker: job payload
+    Worker->>SSG: POST /courses
+    SSG-->>Worker: 201 Created / error
+    Worker->>API: log outcome, update audit trail
 ```
 
-## Entities
-- **Course**: core training offering, holds modules and class runs.
-- **CourseModule**: module metadata with duration.
-- **ClassRun**: scheduled instance with capacity and sessions.
-- **Session**: dated lesson tied to optional module.
-- **Trainer**: instructor with SSG trainer ID reference.
-- **Learner**: participant with hashed identifier surrogate for NRIC.
-- **Enrollment**: join table capturing status and SSG enrollment ID.
-- **Attendance**: per session record referencing enrollment.
-- **Assessment**: learner performance and pass/fail.
-- **Certificate**: issued per assessment.
-- **AuditTrail**: logs CRUD actions with actor role.
+### B. Class Run Registration
+```mermaid
+sequenceDiagram
+    Ops->>API: POST /api/v1/courses/{id}/runs
+    API->>Queue: enqueue sync_class_run_to_ssg(class_run_id)
+    Worker->>SSG: POST /courses/courseRuns
+    SSG-->>Worker: run identifier or error
+    Worker->>DB: persist SSG run ID if provided
+```
 
-## Sequence Flows
-### Course Creation & Publish
-1. Ops user creates course locally.
-2. System records audit entry and enqueues `sync_course` job.
-3. Worker obtains SSG token and calls `/courses` endpoint (per sample code).
-4. On success, store returned identifiers for traceability.
+### C. Learner Enrollment and Attendance Submission
+```mermaid
+sequenceDiagram
+    Ops->>API: POST /api/v1/enrollments
+    API->>Queue: enqueue sync_class_run_to_ssg(class_run_id)
+    Trainer->>API: POST /api/v1/attendance
+    API->>Queue: enqueue sync_attendance_to_ssg(attendance_id)
+    Worker->>SSG: POST /courses/runs/sessions/attendance
+    SSG-->>Worker: response with correlation ID
+    Worker->>Logs: store correlation + status
+```
 
-### Class Run Registration
-1. Ops configures schedule and sessions.
-2. `sync_class_run` job enqueued.
-3. Worker submits payload to `/courses/courseRuns`.
-
-### Learner Enrollment & Attendance
-1. Ops enrols learner into class run.
-2. `sync_enrollment` job posts to `/courses/courseRuns/enrolments`.
-3. Attendance marking triggers `sync_attendance` posting to `/courses/courseRuns/sessions/attendance`.
-
-### Claims Submission
-1. Finance finalises claim data.
-2. Job posts to `/courses/courseRuns/claims` with supporting document pointer.
-3. Responses logged with correlation IDs for reconciliation.
+### D. Claims Submission (placeholder)
+> Future enhancement: After SSG releases claims endpoint for providers, extend worker to submit attendance-derived claims and store claim references for reconciliation.

@@ -1,24 +1,43 @@
 # Hawker Boys Training Management System
 
-The Hawker Boys TMS is a PDPA-aware platform for managing courses, learners, and SkillsFuture Singapore synchronisation.
+The Hawker Boys TMS is a secure, PDPA-aware platform for managing training programmes, syncing with SkillsFuture Singapore (SSG), and supporting our culinary and financial literacy cohorts.
 
 ## Runbook
 
-### Quickstart
-1. Ensure Python 3.11 and Node.js 18 are installed.
-2. Copy `.env.example` to `.env` and adjust values.
-3. Run `make venv` then `make dev` for tmux-based orchestration.
+1. **Bootstrap local environment**
+   - Copy `.env.example` to `.env` and adjust secrets.
+   - Run `make node_env` once to install Node 20 and set up npm via nvm.
+   - Run `make dev` to launch PostgreSQL, Redis, the FastAPI backend, the worker, and the React admin UI.
+   - Access the API docs at `http://localhost:8000/docs` and the admin UI at `http://localhost:5173`.
+2. **Manage schema**
+   - Use `make migrate` to generate and apply Alembic migrations.
+   - Review generated files under `backend/tms/migrations/versions/` before committing.
+3. **Testing**
+   - Run `make test` for backend pytest and frontend checks.
+4. **Preflight checks**
+   - Run `make preflight` before deployment to validate environment variables, database connectivity, pending migrations, and Redis availability.
+5. **Deployment**
+   - Follow `docs/README.md` and `ops/README-deploy.md` for step-by-step guidance covering Render, Railway, and AWS Lightsail paths.
 
-### Scripts
-- `make backend` - run FastAPI.
-- `make frontend` - run Vite dev server.
-- `make worker` - start RQ worker.
-- `make migrate` - apply Alembic migrations.
-- `make preflight` - verify environment readiness.
+### Helpful make targets
+- `make backend` – run FastAPI locally.
+- `make frontend` – run the Vite dev server.
+- `make worker` – start the RQ worker.
+- `make migrate` – apply Alembic migrations.
+- `make preflight` – verify environment readiness.
 
 ### Environment notes
 - `.env` drives configuration via Pydantic settings.
-- PostgreSQL recommended; SQLite works for local testing.
+- PostgreSQL is recommended; SQLite only for quick smoke tests.
 
-## Project Structure
-Refer to `/docs/README.md` for a deep dive into architecture, PDPA controls, and SSG integration flows.
+## Repository Layout
+- `backend/` – FastAPI application, domain models, SSG client, and migrations.
+- `frontend/` – React admin console built with Vite.
+- `ops/` – Deployment artefacts including Docker Compose and platform notes.
+- `docs/` – Operator documentation, ERD, security posture, and SSG error catalog.
+
+## Contributing
+1. Create a feature branch from `main`.
+2. Keep commits focused and use conventional commit messages.
+3. Update documentation and tests alongside code changes.
+4. Refer to `/docs/README.md` for architecture, PDPA controls, and SSG integration flows.
