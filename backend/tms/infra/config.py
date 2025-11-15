@@ -3,10 +3,11 @@ from __future__ import annotations
 from functools import lru_cache
 
 from pydantic import AnyUrl, Field
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=['.env','../.env'], env_file_encoding='utf-8', case_sensitive=False, extra='ignore')
     app_env: str = Field("local", alias="APP_ENV")
     api_host: str = Field("0.0.0.0", alias="API_HOST")
     api_port: int = Field(8000, alias="API_PORT")
@@ -33,12 +34,6 @@ class Settings(BaseSettings):
     default_admin_password: str = Field(..., alias="DEFAULT_ADMIN_PASSWORD")
 
     sentry_dsn: str | None = Field(None, alias="SENTRY_DSN")
-
-    class Config:
-        env_file = ".env"
-        case_sensitive = False
-
-
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
     return Settings()
