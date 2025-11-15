@@ -15,7 +15,7 @@ class Base(DeclarativeBase):
 
 def _create_engine():
     kwargs: dict[str, object] = {"future": True, "pool_pre_ping": True}
-    if settings.database_url.startswith("sqlite"):
+    if str(settings.database_url).startswith("sqlite"):
         kwargs["connect_args"] = {"check_same_thread": False}
     else:
         pool_size = getattr(settings, "db_pool_size", None)
@@ -24,7 +24,7 @@ def _create_engine():
             kwargs["pool_size"] = pool_size
         if max_overflow:
             kwargs["max_overflow"] = max_overflow
-    return create_engine(settings.database_url, **kwargs)
+    return create_engine(str(settings.database_url), **kwargs)
 
 
 def get_engine():
