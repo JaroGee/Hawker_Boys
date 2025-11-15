@@ -10,6 +10,10 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from tms.infra.database import Base
 
 
+def enum_values(enum_cls):
+    return [member.value for member in enum_cls]
+
+
 class TimestampMixin:
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
@@ -113,7 +117,9 @@ class Enrollment(Base, TimestampMixin):
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     learner_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("learners.id", ondelete="CASCADE"), index=True)
     class_run_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("class_runs.id", ondelete="CASCADE"), index=True)
-    status: Mapped[EnrollmentStatus] = mapped_column(Enum(EnrollmentStatus), default=EnrollmentStatus.PENDING)
+    status: Mapped[EnrollmentStatus] = mapped_column(
+        Enum(EnrollmentStatus, name="enrollmentstatus", values_callable=enum_values), default=EnrollmentStatus.PENDING
+    )
     ssg_enrollment_id: Mapped[str | None] = mapped_column(String(128), index=True, unique=True)
 
     learner: Mapped[Learner] = relationship("Learner", back_populates="enrollments")
@@ -135,7 +141,9 @@ class Attendance(Base, TimestampMixin):
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     enrollment_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("enrollments.id", ondelete="CASCADE"), index=True)
     session_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("sessions.id", ondelete="CASCADE"), index=True)
-    status: Mapped[AttendanceStatus] = mapped_column(Enum(AttendanceStatus))
+    status: Mapped[AttendanceStatus] = mapped_column(
+        Enum(AttendanceStatus, name="attendancestatus", values_callable=enum_values)
+    )
     remarks: Mapped[str | None] = mapped_column(Text())
 
     enrollment: Mapped[Enrollment] = relationship("Enrollment", back_populates="attendance_records")
@@ -194,6 +202,5 @@ class AuditTrail(Base, TimestampMixin):
     actor_role: Mapped[str | None] = mapped_column(String(64))
     entity_type: Mapped[str] = mapped_column(String(128), index=True)
     entity_id: Mapped[str] = mapped_column(String(128))
-    action: Mapped[AuditAction] = mapped_column(Enum(AuditAction))
+    action: Mapped[AuditAction] = mapped_column(Enum(AuditAction, name="auditaction", values_callable=enum_values))
     context: Mapped[str | None] = mapped_column(Text())
-

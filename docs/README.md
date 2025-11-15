@@ -119,3 +119,9 @@ Logs default to JSON lines. Pipe into `jq` for filtering: `tail -f backend.log |
 - Ops team: ops@hawkerboys.example
 - Engineering: devs@hawkerboys.example
 - Emergency escalation: call duty engineer (see internal roster).
+
+## Dev environment
+- We standardize on Node 20 via nvm
+- Run `scripts/setup_node_intel.sh` once
+- Run `make node_modules` to install deps
+- If Terminal still cannot find node, run: `source ~/.zshrc`

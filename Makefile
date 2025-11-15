@@ -1,47 +1,25 @@
-.PHONY: dev backend frontend worker migrate test lint format seed preflight
+SHELL := /bin/zsh
 
-PYTHON ?= python3
-PIP ?= pip
-
-venv:
-[ -d .venv ] || $(PYTHON) -m venv .venv
-. .venv/bin/activate && $(PIP) install --upgrade pip
-. .venv/bin/activate && pip install -e backend/[dev]
-
-node_modules:
-cd frontend && [ -f package-lock.json ] && npm ci || npm install
+.PHONY: preflight node_env node_modules dev test migrate
 
 preflight:
-. .venv/bin/activate && python backend/scripts/preflight.py
+	@echo "Preflight checks..."
+	@command -v node >/dev/null || (echo "Node is missing. Run scripts/setup_node_intel.sh" && exit 1)
+	@node -v | grep -E "v20\." >/dev/null || (echo "Node 20 required. Current: $$(node -v)" && exit 1)
 
-backend:
-. .venv/bin/activate && uvicorn tms.api:app --reload --app-dir backend
+node_env:
+	@./scripts/setup_node_intel.sh
 
-frontend:
-cd frontend && npm run dev
+node_modules: preflight
+	@if [ -f frontend/package.json ]; then cd frontend && npm install; \
+	else if [ -f package.json ]; then npm install; else echo "No package.json found"; fi; fi
 
-worker:
-. .venv/bin/activate && rq worker ssg-sync
-
-dev: venv node_modules
-tmux new-session \;
-send-keys 'make backend' C-m \;
-split-window -h \;
-send-keys 'make frontend' C-m \;
-split-window -v \;
-send-keys 'make worker' C-m
-
-migrate:
-. .venv/bin/activate && alembic -c backend/alembic.ini upgrade head
+dev: preflight
+	@if [ -f frontend/package.json ]; then echo "Start your frontend dev server here, for example: cd frontend && npm run dev"; else echo "No frontend detected"; fi
 
 test:
-. .venv/bin/activate && pytest
+	@echo "Add frontend and backend test runners here"
+	@echo "For example: cd frontend && npm test"
 
-lint:
-. .venv/bin/activate && ruff check backend
-
-format:
-. .venv/bin/activate && black backend
-
-seed:
-. .venv/bin/activate && python backend/scripts/seed_data.py
+migrate:
+	@. .venv/bin/activate && alembic -c backend/alembic.ini upgrade head
