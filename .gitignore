@@ -1,0 +1,36 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+.env
+*.egg-info/
+.dist/
+.mypy_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Node
+node_modules/
+.pnpm-store/
+dist/
+build/
+*.log
+
+# Editors
+.idea/
+.vscode/
+*.swp
+
+# Alembic
+backend/tms/migrations/versions/__pycache__/
+
+# Redis dumps
+*.rdb
