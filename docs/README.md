@@ -18,16 +18,34 @@ The Hawker Boys Training Management System (TMS) supports our post-release learn
   2. **Render** - predictable pricing, native background worker support.
   3. **AWS Lightsail** - for teams already on AWS, provides Singapore region instances with fixed monthly cost.
 
-## 4. Quick Deployment (Render example)
-1. Fork the repository or connect Render to the GitHub repo.
-2. Provision Render PostgreSQL (small) and Redis (starter) instances.
+## 4. Deployment Quick Start
+
+The detailed runbooks live in `ops/README-deploy.md`. Use the summaries below when you need a fast refresher.
+
+### 4.1 Railway
+1. Create a project and provision managed PostgreSQL and Redis services in the Singapore region.
+2. Deploy the backend using the Docker image built from `ops/dockerfiles/backend.Dockerfile`. Set the start command to `uvicorn tms.main:app --host 0.0.0.0 --port 8000`.
+3. Add a worker service with the same image and command `rq worker ssg_sync`.
+4. Deploy the frontend as a static site using the `frontend/dist` build output.
+5. Populate environment variables from `.env.example` and configure HTTP health checks pointing at `/healthz`.
+
+### 4.2 Render
+1. Fork the repository or link Render directly to GitHub.
+2. Provision Render PostgreSQL (small) and Redis (starter).
 3. Create a Web Service:
    - Build command: `cd backend && pip install . && alembic upgrade head`
    - Start command: `uvicorn tms.main:app --host 0.0.0.0 --port 8000`
    - Add environment variables from `.env.example`.
-4. Create a Background Worker using the same image with command `rq worker ssg_sync`.
-5. Deploy the frontend as a Static Site using `frontend` folder with build command `npm install && npm run build` and publish directory `frontend/dist`.
-6. Configure health checks at `/healthz` (liveness) and `/readiness` (readiness).
+4. Create a Background Worker with the same repo and command `rq worker ssg_sync`.
+5. Deploy the frontend as a Static Site using `frontend` with build command `npm install && npm run build` and publish directory `frontend/dist`.
+6. Configure health checks at `/healthz` and `/readiness`.
+
+### 4.3 AWS Lightsail
+1. Provision a container service in ap-southeast-1 and attach a Lightsail managed PostgreSQL database.
+2. Build and push backend and worker container images, then deploy them as separate services.
+3. Publish the frontend via Lightsail static site hosting or a small container serving `frontend/dist`.
+4. Attach a load balancer with HTTPS enabled in front of the backend container.
+5. Schedule nightly snapshots for both the container service and database to cover disaster recovery.
 
 ## 5. Developer Setup
 1. **Clone and environment**
