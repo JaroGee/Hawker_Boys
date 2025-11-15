@@ -1,30 +1,40 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
 # Python
 __pycache__/
 *.py[cod]
-*.egg-info/
+*$py.class
 .venv/
+venv/
+.env
+.env.*
+*.egg-info/
+.dist/
+.mypy_cache/
+.pytest_cache/
+.coverage
+htmlcov/
 
 # Node
 node_modules/
+.pnpm-store/
+dist/
+build/
 npm-debug.log*
+*.log
 yarn.lock
 pnpm-lock.yaml
 
-# macOS
-.DS_Store
-
-# env
-.env
-.env.*
-
 # Editors
-.vscode/
 .idea/
+.vscode/
+*.swp
 
-# Build
-/dist
-/build
+# Alembic
+backend/tms/migrations/versions/__pycache__/
 
-# Coverage
-.coverage
-htmlcov/
+# Redis dumps
+*.rdb

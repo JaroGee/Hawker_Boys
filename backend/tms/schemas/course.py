@@ -1,45 +1,65 @@
 from __future__ import annotations
 
+import datetime as dt
 import uuid
-from typing import Optional
 
 from pydantic import BaseModel, Field
 
 
-class CourseModuleCreate(BaseModel):
-    code: str
+class ModuleCreate(BaseModel):
     title: str
-    description: Optional[str] = None
-    duration_hours: int = Field(gt=0)
+    description: str | None = None
+    order: int = 0
 
 
-class CourseModuleRead(CourseModuleCreate):
+class ModuleRead(ModuleCreate):
     id: uuid.UUID
+
+
+class CourseBase(BaseModel):
+    code: str = Field(..., max_length=50)
+    title: str = Field(..., max_length=255)
+    description: str | None = None
+    is_active: bool = True
+
+
+class CourseCreate(CourseBase):
+    modules: list[ModuleCreate] = []
+
+
+class CourseUpdate(BaseModel):
+    title: str | None = None
+    description: str | None = None
+    is_active: bool | None = None
+
+
+class CourseRead(CourseBase):
+    id: uuid.UUID
+    ssg_course_code: str | None
+    created_at: dt.datetime
+    updated_at: dt.datetime
+    modules: list[ModuleRead] = []
 
     class Config:
         from_attributes = True
 
 
-class CourseCreate(BaseModel):
-    code: str
-    title: str
-    description: Optional[str] = None
-    modules: list[CourseModuleCreate] = []
+class ClassRunBase(BaseModel):
+    reference_code: str
+    start_date: dt.date
+    end_date: dt.date
 
 
-class CourseUpdate(BaseModel):
-    title: Optional[str] = None
-    description: Optional[str] = None
-    is_published: Optional[bool] = None
+class ClassRunCreate(ClassRunBase):
+    status: str = "draft"
 
 
-class CourseRead(BaseModel):
+class ClassRunRead(ClassRunBase):
     id: uuid.UUID
-    code: str
-    title: str
-    description: Optional[str] = None
-    is_published: bool
-    modules: list[CourseModuleRead] = []
+    status: str
+    ssg_run_id: str | None
+    created_at: dt.datetime
+    updated_at: dt.datetime
 
     class Config:
         from_attributes = True

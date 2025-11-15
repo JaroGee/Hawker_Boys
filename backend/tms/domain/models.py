@@ -1,134 +1,193 @@
 from __future__ import annotations
 
+import datetime as dt
 import uuid
-from datetime import date, datetime, timezone
-from enum import Enum as PyEnum
 
-from sqlalchemy import Boolean, Date, DateTime, Enum, ForeignKey, String, Text, UniqueConstraint
+from sqlalchemy import (
+    Boolean,
+    Date,
+    DateTime,
+    Enum,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    Index,
+)
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from tms.infra.database import Base
 
 
-def enum_values(enum_cls):
-    return [member.value for member in enum_cls]
-
-
 class TimestampMixin:
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=dt.datetime.utcnow, nullable=False
+    )
+    updated_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=dt.datetime.utcnow, onupdate=dt.datetime.utcnow
+    )
 
 
 class Course(Base, TimestampMixin):
     __tablename__ = "courses"
 
-    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
-    code: Mapped[str] = mapped_column(String(64), unique=True, index=True)
-    title: Mapped[str] = mapped_column(String(255))
-    description: Mapped[str | None] = mapped_column(Text())
-    is_published: Mapped[bool] = mapped_column(Boolean(), default=False)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    code: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text)
+    ssg_course_code: Mapped[str | None] = mapped_column(String(100), index=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
-    modules: Mapped[list[CourseModule]] = relationship("CourseModule", back_populates="course", cascade="all, delete-orphan")
-    runs: Mapped[list[ClassRun]] = relationship("ClassRun", back_populates="course")
+    modules: Mapped[list["Module"]] = relationship(back_populates="course", cascade="all, delete-orphan")
+    runs: Mapped[list["ClassRun"]] = relationship(back_populates="course", cascade="all, delete-orphan")
 
 
-class CourseModule(Base, TimestampMixin):
-    __tablename__ = "course_modules"
-    __table_args__ = (UniqueConstraint("course_id", "code", name="uq_module_code_per_course"),)
+class Module(Base, TimestampMixin):
+    __tablename__ = "modules"
 
-    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
-    course_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("courses.id", ondelete="CASCADE"), index=True)
-    code: Mapped[str] = mapped_column(String(64))
-    title: Mapped[str] = mapped_column(String(255))
-    description: Mapped[str | None] = mapped_column(Text())
-    duration_hours: Mapped[int] = mapped_column()
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    course_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("courses.id", ondelete="CASCADE"), nullable=False)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text)
+    order: Mapped[int] = mapped_column(Integer, default=0)
 
-    course: Mapped[Course] = relationship("Course", back_populates="modules")
+    course: Mapped[Course] = relationship(back_populates="modules")
+
+    __table_args__ = (Index("ix_modules_course_id_order", "course_id", "order"),)
+
+
+class ClassRunStatusEnum(str, Enum):  # type: ignore[misc]
+    DRAFT = "draft"
+    PUBLISHED = "published"
+    COMPLETED = "completed"
+    CANCELLED = "cancelled"
 
 
 class ClassRun(Base, TimestampMixin):
     __tablename__ = "class_runs"
 
-    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
-    course_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("courses.id", ondelete="RESTRICT"), index=True)
-    code: Mapped[str] = mapped_column(String(64), unique=True, index=True)
-    start_date: Mapped[date] = mapped_column(Date())
-    end_date: Mapped[date] = mapped_column(Date())
-    capacity: Mapped[int] = mapped_column()
-    location: Mapped[str | None] = mapped_column(String(255))
-    ssg_run_id: Mapped[str | None] = mapped_column(String(128), index=True, unique=True)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    course_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("courses.id", ondelete="CASCADE"), nullable=False)
+    reference_code: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
+    start_date: Mapped[dt.date] = mapped_column(Date, nullable=False)
+    end_date: Mapped[dt.date] = mapped_column(Date, nullable=False)
+    status: Mapped[ClassRunStatusEnum] = mapped_column(Enum(ClassRunStatusEnum), default=ClassRunStatusEnum.DRAFT)
+    ssg_run_id: Mapped[str | None] = mapped_column(String(100), index=True)
 
-    course: Mapped[Course] = relationship("Course", back_populates="runs")
-    sessions: Mapped[list[Session]] = relationship("Session", back_populates="class_run", cascade="all, delete-orphan")
-    enrollments: Mapped[list[Enrollment]] = relationship("Enrollment", back_populates="class_run")
+    course: Mapped[Course] = relationship(back_populates="runs")
+    sessions: Mapped[list["Session"]] = relationship(back_populates="class_run", cascade="all, delete-orphan")
+    enrollments: Mapped[list["Enrollment"]] = relationship(back_populates="class_run", cascade="all, delete-orphan")
+
+    __table_args__ = (
+        Index("ix_class_runs_course_status", "course_id", "status"),
+    )
 
 
 class Session(Base, TimestampMixin):
     __tablename__ = "sessions"
 
-    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
-    class_run_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("class_runs.id", ondelete="CASCADE"), index=True)
-    module_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("course_modules.id", ondelete="SET NULL"), nullable=True)
-    session_date: Mapped[date] = mapped_column(Date())
-    start_time: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-    end_time: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    class_run_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("class_runs.id", ondelete="CASCADE"), nullable=False)
+    session_date: Mapped[dt.date] = mapped_column(Date, nullable=False)
+    location: Mapped[str | None] = mapped_column(String(255))
+    duration_minutes: Mapped[int] = mapped_column(Integer, nullable=False)
 
-    class_run: Mapped[ClassRun] = relationship("ClassRun", back_populates="sessions")
-    module: Mapped[CourseModule | None] = relationship("CourseModule")
-    attendance_records: Mapped[list[Attendance]] = relationship("Attendance", back_populates="session", cascade="all, delete-orphan")
+    class_run: Mapped[ClassRun] = relationship(back_populates="sessions")
+    attendance_records: Mapped[list["Attendance"]] = relationship(back_populates="session", cascade="all, delete-orphan")
+
+    __table_args__ = (
+        UniqueConstraint("class_run_id", "session_date", name="uq_session_date_per_run"),
+    )
 
 
-class Trainer(Base, TimestampMixin):
-    __tablename__ = "trainers"
+class UserRoleEnum(str, Enum):  # type: ignore[misc]
+    ADMIN = "admin"
+    TRAINER = "trainer"
+    OPS = "ops"
+    LEARNER = "learner"
 
-    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
-    full_name: Mapped[str] = mapped_column(String(255))
-    email: Mapped[str] = mapped_column(String(255), unique=True)
-    contact_number: Mapped[str | None] = mapped_column(String(32))
-    ssg_trainer_id: Mapped[str | None] = mapped_column(String(128), index=True, unique=True)
 
-    sessions: Mapped[list[SessionTrainer]] = relationship("SessionTrainer", back_populates="trainer")
+class User(Base, TimestampMixin):
+    __tablename__ = "users"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
+    full_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    role: Mapped[UserRoleEnum] = mapped_column(Enum(UserRoleEnum), nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    last_login_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class Learner(Base, TimestampMixin):
     __tablename__ = "learners"
 
-    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
-    full_name: Mapped[str] = mapped_column(String(255))
-    email: Mapped[str | None] = mapped_column(String(255), unique=True)
-    contact_number: Mapped[str | None] = mapped_column(String(32))
-    hashed_identifier: Mapped[str | None] = mapped_column(String(255), unique=True)
-    date_of_birth: Mapped[date | None] = mapped_column(Date(), nullable=True)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    given_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    family_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    date_of_birth: Mapped[dt.date | None] = mapped_column(Date)
+    contact_number: Mapped[str | None] = mapped_column(String(50))
+    masked_nric: Mapped[str | None] = mapped_column(String(20), index=True)
 
-    enrollments: Mapped[list[Enrollment]] = relationship("Enrollment", back_populates="learner")
+    user: Mapped[User | None] = relationship()
+    enrollments: Mapped[list["Enrollment"]] = relationship(back_populates="learner")
 
 
-class EnrollmentStatus(PyEnum):
-    PENDING = "pending"
-    CONFIRMED = "confirmed"
+class Trainer(Base, TimestampMixin):
+    __tablename__ = "trainers"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    bio: Mapped[str | None] = mapped_column(Text)
+    certifications: Mapped[str | None] = mapped_column(Text)
+    ssg_trainer_id: Mapped[str | None] = mapped_column(String(100), index=True)
+
+    user: Mapped[User | None] = relationship()
+    sessions: Mapped[list[Session]] = relationship(secondary="trainer_sessions", back_populates="trainers")
+
+
+class TrainerSession(Base):
+    __tablename__ = "trainer_sessions"
+
+    trainer_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("trainers.id", ondelete="CASCADE"), primary_key=True)
+    session_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("sessions.id", ondelete="CASCADE"), primary_key=True)
+
+
+Session.trainers = relationship(  # type: ignore[attr-defined]
+    "Trainer", secondary="trainer_sessions", back_populates="sessions"
+)
+
+
+class EnrollmentStatusEnum(str, Enum):  # type: ignore[misc]
+    REGISTERED = "registered"
+    IN_PROGRESS = "in_progress"
     COMPLETED = "completed"
     WITHDRAWN = "withdrawn"
 
 
 class Enrollment(Base, TimestampMixin):
     __tablename__ = "enrollments"
-    __table_args__ = (UniqueConstraint("learner_id", "class_run_id", name="uq_enrollment_learner_run"),)
 
-    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
-    learner_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("learners.id", ondelete="CASCADE"), index=True)
-    class_run_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("class_runs.id", ondelete="CASCADE"), index=True)
-    status: Mapped[EnrollmentStatus] = mapped_column(
-        Enum(EnrollmentStatus, name="enrollmentstatus", values_callable=enum_values), default=EnrollmentStatus.PENDING
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    learner_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("learners.id", ondelete="CASCADE"), nullable=False)
+    class_run_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("class_runs.id", ondelete="CASCADE"), nullable=False)
+    status: Mapped[EnrollmentStatusEnum] = mapped_column(Enum(EnrollmentStatusEnum), nullable=False)
+    enrollment_date: Mapped[dt.date] = mapped_column(Date, default=dt.date.today)
+    ssg_enrollment_id: Mapped[str | None] = mapped_column(String(100), index=True)
+
+    learner: Mapped[Learner] = relationship(back_populates="enrollments")
+    class_run: Mapped[ClassRun] = relationship(back_populates="enrollments")
+    attendance_records: Mapped[list["Attendance"]] = relationship(back_populates="enrollment")
+
+    __table_args__ = (
+        UniqueConstraint("learner_id", "class_run_id", name="uq_enrollment_per_class_run"),
     )
-    ssg_enrollment_id: Mapped[str | None] = mapped_column(String(128), index=True, unique=True)
-
-    learner: Mapped[Learner] = relationship("Learner", back_populates="enrollments")
-    class_run: Mapped[ClassRun] = relationship("ClassRun", back_populates="enrollments")
-    attendance_records: Mapped[list[Attendance]] = relationship("Attendance", back_populates="enrollment")
-    assessments: Mapped[list[Assessment]] = relationship("Assessment", back_populates="enrollment")
 
 
-class AttendanceStatus(PyEnum):
+class AttendanceStatusEnum(str, Enum):  # type: ignore[misc]
     PRESENT = "present"
     ABSENT = "absent"
     LATE = "late"
@@ -136,71 +195,64 @@ class AttendanceStatus(PyEnum):
 
 class Attendance(Base, TimestampMixin):
     __tablename__ = "attendance"
-    __table_args__ = (UniqueConstraint("enrollment_id", "session_id", name="uq_attendance_unique"),)
 
-    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
-    enrollment_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("enrollments.id", ondelete="CASCADE"), index=True)
-    session_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("sessions.id", ondelete="CASCADE"), index=True)
-    status: Mapped[AttendanceStatus] = mapped_column(
-        Enum(AttendanceStatus, name="attendancestatus", values_callable=enum_values)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    enrollment_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("enrollments.id", ondelete="CASCADE"), nullable=False)
+    session_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("sessions.id", ondelete="CASCADE"), nullable=False)
+    status: Mapped[AttendanceStatusEnum] = mapped_column(Enum(AttendanceStatusEnum), nullable=False)
+    remarks: Mapped[str | None] = mapped_column(Text)
+    submitted_to_ssg: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    enrollment: Mapped[Enrollment] = relationship(back_populates="attendance_records")
+    session: Mapped[Session] = relationship(back_populates="attendance_records")
+
+    __table_args__ = (
+        UniqueConstraint("enrollment_id", "session_id", name="uq_attendance_enrollment_session"),
     )
-    remarks: Mapped[str | None] = mapped_column(Text())
-
-    enrollment: Mapped[Enrollment] = relationship("Enrollment", back_populates="attendance_records")
-    session: Mapped[Session] = relationship("Session", back_populates="attendance_records")
 
 
 class Assessment(Base, TimestampMixin):
     __tablename__ = "assessments"
 
-    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
-    enrollment_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("enrollments.id", ondelete="CASCADE"), index=True)
-    score: Mapped[float | None] = mapped_column()
-    passed: Mapped[bool | None] = mapped_column(Boolean())
-    remarks: Mapped[str | None] = mapped_column(Text())
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    enrollment_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("enrollments.id", ondelete="CASCADE"), nullable=False)
+    score: Mapped[int] = mapped_column(Integer, nullable=False)
+    remarks: Mapped[str | None] = mapped_column(Text)
+    assessed_on: Mapped[dt.date] = mapped_column(Date, default=dt.date.today)
 
-    enrollment: Mapped[Enrollment] = relationship("Enrollment", back_populates="assessments")
-    certificate: Mapped[Certificate | None] = relationship("Certificate", back_populates="assessment", uselist=False)
+    enrollment: Mapped[Enrollment] = relationship()
 
 
 class Certificate(Base, TimestampMixin):
     __tablename__ = "certificates"
 
-    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
-    assessment_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("assessments.id", ondelete="CASCADE"), unique=True)
-    issued_on: Mapped[date] = mapped_column(Date())
-    certificate_number: Mapped[str] = mapped_column(String(128), unique=True)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    enrollment_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("enrollments.id", ondelete="CASCADE"), unique=True)
+    issued_on: Mapped[dt.date] = mapped_column(Date, default=dt.date.today)
+    certificate_url: Mapped[str] = mapped_column(String(255), nullable=False)
 
-    assessment: Mapped[Assessment] = relationship("Assessment", back_populates="certificate")
-
-
-class SessionTrainer(Base, TimestampMixin):
-    __tablename__ = "session_trainers"
-    __table_args__ = (UniqueConstraint("session_id", "trainer_id", name="uq_session_trainer"),)
-
-    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
-    session_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("sessions.id", ondelete="CASCADE"), index=True)
-    trainer_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("trainers.id", ondelete="CASCADE"), index=True)
-    primary: Mapped[bool] = mapped_column(Boolean(), default=True)
-
-    session: Mapped[Session] = relationship("Session")
-    trainer: Mapped[Trainer] = relationship("Trainer", back_populates="sessions")
+    enrollment: Mapped[Enrollment] = relationship()
 
 
-class AuditAction(PyEnum):
+class AuditActionEnum(str, Enum):  # type: ignore[misc]
     CREATE = "create"
     UPDATE = "update"
     DELETE = "delete"
-    VIEW = "view"
+    EXPORT = "export"
+    ACCESS = "access"
 
 
-class AuditTrail(Base, TimestampMixin):
+class AuditTrail(Base):
     __tablename__ = "audit_trails"
 
-    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
-    actor_id: Mapped[uuid.UUID | None] = mapped_column(nullable=True, index=True)
-    actor_role: Mapped[str | None] = mapped_column(String(64))
-    entity_type: Mapped[str] = mapped_column(String(128), index=True)
-    entity_id: Mapped[str] = mapped_column(String(128))
-    action: Mapped[AuditAction] = mapped_column(Enum(AuditAction, name="auditaction", values_callable=enum_values))
-    context: Mapped[str | None] = mapped_column(Text())
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    performed_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), index=True)
+    action: Mapped[AuditActionEnum] = mapped_column(Enum(AuditActionEnum), nullable=False)
+    entity_type: Mapped[str] = mapped_column(String(100), nullable=False)
+    entity_id: Mapped[str] = mapped_column(String(100), nullable=False)
+    timestamp: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=dt.datetime.utcnow)
+    context: Mapped[str | None] = mapped_column(Text)
+
+    __table_args__ = (
+        Index("ix_audit_entity", "entity_type", "entity_id"),
+    )

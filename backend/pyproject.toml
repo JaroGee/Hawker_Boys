@@ -5,27 +5,33 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "hawker-boys-tms"
 version = "0.1.0"
-description = "Training Management System for Hawker Boys"
-authors = [{ name = "Hawker Boys", email = "ops@hawkerboys.example" }]
+description = "Training Management System backend for Hawker Boys"
 readme = "README.md"
+requires-python = ">=3.11"
+authors = [{ name = "Hawker Boys", email = "ops@hawkerboys.example" }]
 license = { text = "MIT" }
-requires-python = ">=3.10"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Framework :: FastAPI",
+]
 dependencies = [
     "fastapi>=0.110.0",
     "uvicorn[standard]>=0.27.0",
     "sqlalchemy>=2.0.25",
-    "alembic>=1.13.1",
     "psycopg[binary]>=3.1.12",
-    "pydantic>=2.5.0",
-    "pydantic-settings>=2.0.3",
+    "alembic>=1.13.1",
+    "pydantic>=2.6.0",
+    "pydantic-settings>=2.2.0",
     "python-jose[cryptography]>=3.3.0",
     "passlib[bcrypt]>=1.7.4",
     "bcrypt>=4.1.2",
+    "python-dotenv>=1.0.0",
+    "httpx>=0.27.0",
+    "tenacity>=8.2.3",
     "redis>=5.0.1",
     "rq>=1.15.1",
-    "httpx>=0.26.0",
-    "tenacity>=8.2.3",
     "structlog>=23.2.0",
+    "loguru>=0.7.0",
     "python-multipart>=0.0.9",
     "email-validator>=2.1.0",
     "cryptography>=42.0.5"
@@ -33,13 +39,16 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=7.4.4",
+    "pytest>=8.0.0",
     "pytest-asyncio>=0.23.3",
-    "httpx>=0.26.0",
+    "httpx>=0.27.0",
     "black>=24.3.0",
     "ruff>=0.3.0",
     "mypy>=1.8.0"
 ]
+
+[tool.setuptools.packages.find]
+where = ["tms"]
 
 [tool.black]
 line-length = 88

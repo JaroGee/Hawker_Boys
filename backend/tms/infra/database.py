@@ -1,33 +1,45 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
-from typing import Generator
+from typing import Iterator
 
 from sqlalchemy import create_engine
-from sqlalchemy.orm import DeclarativeBase, sessionmaker
+from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
-from tms.settings import settings
+from tms.infra.config import settings
 
 
 class Base(DeclarativeBase):
     pass
 
 
-if settings.database_url.startswith("sqlite"):
-    engine = create_engine(settings.database_url, connect_args={"check_same_thread": False})
-else:
-    engine = create_engine(
-        settings.database_url,
-        pool_pre_ping=True,
-        pool_size=settings.db_pool_size,
-        max_overflow=settings.db_max_overflow,
-    )
+def _create_engine():
+    kwargs: dict[str, object] = {"future": True, "pool_pre_ping": True}
+    if settings.database_url.startswith("sqlite"):
+        kwargs["connect_args"] = {"check_same_thread": False}
+    else:
+        pool_size = getattr(settings, "db_pool_size", None)
+        max_overflow = getattr(settings, "db_max_overflow", None)
+        if pool_size:
+            kwargs["pool_size"] = pool_size
+        if max_overflow:
+            kwargs["max_overflow"] = max_overflow
+    return create_engine(settings.database_url, **kwargs)
 
-SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
+
+def get_engine():
+    return engine
 
 
-@contextmanager
-def session_scope() -> Generator:
+def get_db() -> Iterator[Session]:
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+def session_scope() -> Iterator[Session]:
     session = SessionLocal()
     try:
         yield session
@@ -39,5 +51,5 @@ def session_scope() -> Generator:
         session.close()
 
 
-def get_engine():
-    return engine
+engine = _create_engine()
+SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)

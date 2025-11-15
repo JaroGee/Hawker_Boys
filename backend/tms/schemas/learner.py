@@ -1,34 +1,27 @@
 from __future__ import annotations
 
+import datetime as dt
 import uuid
-from datetime import date
-from typing import Optional
 
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 
 
-class LearnerCreate(BaseModel):
-    full_name: str
-    email: Optional[EmailStr] = None
-    contact_number: Optional[str] = None
-    hashed_identifier: Optional[str] = None
-    date_of_birth: Optional[date] = None
+class LearnerBase(BaseModel):
+    given_name: str
+    family_name: str
+    date_of_birth: dt.date | None = None
+    contact_number: str | None = None
 
 
-class LearnerUpdate(BaseModel):
-    full_name: Optional[str] = None
-    email: Optional[EmailStr] = None
-    contact_number: Optional[str] = None
-    date_of_birth: Optional[date] = None
+class LearnerCreate(LearnerBase):
+    masked_nric: str | None = None
 
 
-class LearnerRead(BaseModel):
+class LearnerRead(LearnerBase):
     id: uuid.UUID
-    full_name: str
-    email: Optional[EmailStr]
-    contact_number: Optional[str]
-    hashed_identifier: Optional[str]
-    date_of_birth: Optional[date]
+    masked_nric: str | None
+    created_at: dt.datetime
+    updated_at: dt.datetime
 
     class Config:
         from_attributes = True

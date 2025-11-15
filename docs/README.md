@@ -1,124 +1,158 @@
 # Hawker Boys TMS Operator Guide
 
 ## 1. Overview
-The Hawker Boys Training Management System (TMS) supports course planning, learner management, and SkillsFuture Singapore (SSG) integrations for adult learners transitioning back to society. This guide serves operations staff, trainers, and engineers maintaining the platform.
+The Hawker Boys Training Management System (TMS) supports our post-release learners with secure course administration, SSG grant eligibility workflows, and operational guardrails designed for a small but vigilant team. This guide is written for operations staff, trainers, and volunteer engineers who keep the platform running.
 
 ## 2. Architecture Summary
-- **Backend (FastAPI)** - Provides REST APIs, RBAC, and SSG sync jobs.
-- **Database (PostgreSQL + SQLAlchemy)** - Stores core TMS data with Alembic migrations.
-- **Frontend (React + Vite)** - Lightweight admin interface.
-- **Background Jobs (RQ + Redis)** - Queues outbound SSG calls and retries failures.
-- **Infrastructure** - Container-friendly with Docker Compose for local dev.
+- **Backend**: FastAPI service with SQLAlchemy ORM, Alembic migrations, and JWT-based RBAC.
+- **Database**: PostgreSQL with encrypted volumes recommended at the platform layer.
+- **Background Jobs**: RQ workers connected to Redis queue outbound SSG updates so classroom activities continue if SSG is down.
+- **Frontend**: Lightweight React + Vite admin console for quick operator actions.
+- **SSG Integration**: Typed HTTPX client with exponential backoff, aligned with official sample codes (see inline references in `backend/tms/ssg_client`).
+- **Observability**: Structured logging via Loguru, optional Sentry integration through `SENTRY_DSN`.
 
-## 3. Platform Support
-- **Local development**: macOS, Windows (WSL2), Linux.
-- **Recommended hosting**:
-  - *Railway*: simple deployments, managed PostgreSQL, auto HTTPS.
-  - *Render*: background workers supported, Singapore data center options.
-  - *AWS Lightsail*: predictable pricing, VPC peering to managed RDS if required.
+## 3. Supported Platforms
+- **Local development**: macOS (Apple Silicon), Windows 11 (WSL2), and Ubuntu 22.04.
+- **Recommended hosted options**:
+  1. **Railway** - fastest setup, managed Postgres and Redis, supports secrets UI.
+  2. **Render** - predictable pricing, native background worker support.
+  3. **AWS Lightsail** - for teams already on AWS, provides Singapore region instances with fixed monthly cost.
 
-### Example Deployment (Render)
-1. Fork repo and connect Render account.
-2. Create a PostgreSQL instance and Redis instance.
-3. Add a Web Service pointing to `/backend` with `uvicorn tms.api:app --host 0.0.0.0 --port 8000`.
-4. Add a Background Worker with `rq worker ssg-sync`.
-5. Configure environment variables from `.env.example`.
-6. Deploy frontend as static site using `npm install && npm run build`.
+## 4. Deployment Quick Start
 
-## 4. Developer Setup
-1. Install Python 3.11+, Node.js 18+, and Redis locally.
-2. Copy `.env.example` to `.env` and adjust secrets.
-3. Run `make venv` to create the virtual environment.
-4. Execute `make migrate` to apply migrations.
-5. Launch services using `make dev` (tmux orchestrates backend, frontend, worker).
-6. Run `make test` before committing.
+The detailed runbooks live in `ops/README-deploy.md`. Use the summaries below when you need a fast refresher.
 
-## 5. Database & Migrations
-- Alembic migrations live in `backend/tms/migrations`.
-- Generate new migrations with `alembic -c backend/alembic.ini revision --autogenerate -m "describe change"`.
-- Apply with `make migrate`.
-- Backups: use `pg_dump -Fc <db>` nightly and test restores with `pg_restore`.
+### 4.1 Railway
+1. Create a project and provision managed PostgreSQL and Redis services in the Singapore region.
+2. Deploy the backend using the Docker image built from `ops/dockerfiles/backend.Dockerfile`. Set the start command to `uvicorn tms.main:app --host 0.0.0.0 --port 8000`.
+3. Add a worker service with the same image and command `rq worker ssg_sync`.
+4. Deploy the frontend as a static site using the `frontend/dist` build output.
+5. Populate environment variables from `.env.example` and configure HTTP health checks pointing at `/healthz`.
 
-## 6. Configuration
-Environment variables map to `tms.settings.Settings`.
+### 4.2 Render
+1. Fork the repository or link Render directly to GitHub.
+2. Provision Render PostgreSQL (small) and Redis (starter).
+3. Create a Web Service:
+   - Build command: `cd backend && pip install . && alembic upgrade head`
+   - Start command: `uvicorn tms.main:app --host 0.0.0.0 --port 8000`
+   - Add environment variables from `.env.example`.
+4. Create a Background Worker with the same repo and command `rq worker ssg_sync`.
+5. Deploy the frontend as a Static Site using `frontend` with build command `npm install && npm run build` and publish directory `frontend/dist`.
+6. Configure health checks at `/healthz` and `/readiness`.
 
-| Variable | Description |
-| --- | --- |
-| `APP_NAME` | Display name for API docs. |
-| `ENVIRONMENT` | `local`, `staging`, or `production`. |
-| `SECRET_KEY` | JWT signing key, rotate quarterly. |
-| `DATABASE_URL` | PostgreSQL DSN. |
-| `REDIS_URL` | Redis connection for RQ. |
-| `SSG_BASE_URL` | SSG API endpoint (sandbox or prod). |
-| `SSG_CLIENT_ID` / `SSG_CLIENT_SECRET` | OAuth credentials from SSG. |
-| `SSG_TIMEOUT_SECONDS` | HTTP timeout. |
-| `SSG_ENV` | `sandbox` or `production` header for SSG. |
-| `SSG_WEBHOOK_SECRET` | Validates inbound SSG webhooks when enabled. |
-| `LOG_LEVEL` | Logging verbosity. |
+### 4.3 AWS Lightsail
+1. Provision a container service in ap-southeast-1 and attach a Lightsail managed PostgreSQL database.
+2. Build and push backend and worker container images, then deploy them as separate services.
+3. Publish the frontend via Lightsail static site hosting or a small container serving `frontend/dist`.
+4. Attach a load balancer with HTTPS enabled in front of the backend container.
+5. Schedule nightly snapshots for both the container service and database to cover disaster recovery.
+
+## 5. Developer Setup
+1. **Clone and environment**
+   ```bash
+   git clone git@github.com:JaroGee/Hawker_Boys.git
+   cd Hawker_Boys
+   python3 -m venv .venv
+   source .venv/bin/activate
+   pip install -e backend/.[dev]
+   corepack enable
+   cd frontend && npm install && cd ..
+   ```
+2. **Environment variables**
+   - Copy `.env.example` to `.env`.
+   - Update secrets (use a password manager to store originals).
+3. **Database migrations**
+   ```bash
+   make migrate
+   ```
+4. **Run services**
+   ```bash
+   make dev
+   ```
+   - Backend API: `http://localhost:8000`
+   - Swagger UI: `http://localhost:8000/docs`
+   - Frontend admin: `http://localhost:5173`
+   - RQ worker logs appear in the console.
+5. **Testing**
+   ```bash
+   make test
+   ```
+
+## 6. Configuration Reference
+| Variable | Purpose | Example |
+| --- | --- | --- |
+| `APP_ENV` | Runtime environment label | `local` |
+| `API_HOST` / `API_PORT` | Bind address for FastAPI | `0.0.0.0` / `8000` |
+| `SECRET_KEY` | JWT signing key (generate via `openssl rand -hex 32`) | `hexstring` |
+| `DATABASE_URL` | SQLAlchemy connection string | `postgresql+psycopg://user:pass@host/db` |
+| `REDIS_URL` | Redis instance for RQ | `redis://localhost:6379/0` |
+| `SSG_BASE_URL` | SSG API base | `https://sandbox-developer.ssg-wsg.gov.sg/api` |
+| `SSG_CLIENT_ID` / `SSG_CLIENT_SECRET` | OAuth client credentials from SSG | `xxxx` |
+| `SSG_TIMEOUT_SECONDS` | HTTP timeout in seconds | `30` |
+| `SSG_ENV` | `sandbox` or `prod` | `sandbox` |
+| `SSG_WEBHOOK_SECRET` | Signature validation key (if webhooks enabled) | `generated-string` |
+| `DEFAULT_ADMIN_EMAIL` / `DEFAULT_ADMIN_PASSWORD` | Bootstrapped admin login | `ops@example.org` / `ChangeMe123!` |
+| `SENTRY_DSN` | Optional error tracking | `https://key@o.sentry.io/project` |
 
 ## 7. Operations Guide
-### Create a Course
-1. Navigate to the Courses section.
-2. Provide course code, name, modules, and durations.
-3. Save to queue an SSG sync job.
+### 7.1 Create a Course and Class Run
+1. Sign in using the admin UI with the default admin credentials (change immediately).
+2. Create a course via API or UI (UI integration planned) with modules defined.
+3. Add class runs with start/end dates and reference code.
+4. Confirm that the SSG sync job is queued (see worker logs or `/api/v1/audit`).
 
-### Create a Class Run
-1. Choose an existing course.
-2. Define run code, schedule, capacity, and sessions.
-3. Confirm to queue SSG sync.
+### 7.2 Enroll Learners
+1. Register the learner record with masked NRIC (mask example: `S1234567*`).
+2. Enroll the learner into the class run via API `/api/v1/enrollments`.
+3. Verify audit log entry and pending SSG sync job.
 
-### Enroll Learners
-1. Add learner profile (name, contact, hashed identifier for NRIC surrogate).
-2. Enroll learner into class run.
-3. Enrollment sync job enqueued automatically.
+### 7.3 Mark Attendance
+1. After each session, trainers submit attendance via `/api/v1/attendance`.
+2. Attendance records automatically trigger SSG submission jobs.
+3. Monitor job success under **SSG Sync Status** in the frontend.
 
-### Mark Attendance
-1. Access attendance for a session.
-2. Record status (Present, Absent, Late).
-3. Sync job triggers after save.
+### 7.4 Trigger SSG Sync
+- Syncs occur automatically when records are created/updated.
+- To retry manually, enqueue via RQ dashboard or rerun the relevant job function, e.g. `enqueue_ssg_sync("tms.jobs.ssg.sync_course_to_ssg", course_id)`.
 
-### Trigger SSG Sync Manually
-Use the Admin “Sync Now” action or run `rq enqueue tms.jobs.ssg_sync.sync_course <course_id>`.
+### 7.5 Review Sync Status and Resolve Errors
+- Inspect `/api/v1/audit` for audit trail and `/logs` (application logs) for SSG correlation IDs.
+- Cross-reference the response code with `docs/SSG-Error-Catalog.md` for corrective steps.
+- If repeated failures occur, pause retries, validate payloads, and escalate to SSG support with correlation IDs.
 
-### View Sync Status
-- Monitor Redis queue via `rq info`.
-- Structured logs include `ssg_request` and `ssg_error` events with correlation IDs.
-
-### Handle Errors
-Consult `/docs/SSG-Error-Catalog.md` for operator guidance. Resolve data issues locally, requeue the job, and escalate to engineering if repeated failures occur.
-
-## 8. SSG Integration
-- Obtain sandbox credentials from the [SSG Developer Portal](https://developer.ssg-wsg.gov.sg/webapp/docs/product/6kYpfJEWVb7NyYVVHvUmHi#focus).
-- Populate `SSG_CLIENT_ID` and `SSG_CLIENT_SECRET` in the deployment environment.
-- Test connectivity via the preflight command or `httpx` call to `/oauth/token`.
-- All payload models mirror SSG sample code (see repo references in code comments).
+## 8. SSG Integration Checklist
+1. Request sandbox credentials from SSG Developer Portal under the Training Provider product.
+2. Populate `.env` with `SSG_CLIENT_ID`, `SSG_CLIENT_SECRET`, and `SSG_WEBHOOK_SECRET`.
+3. Run `make preflight` to confirm credentials and connectivity.
+4. Test a harmless GET request using `python -m httpx https://.../ping` or the provided `/api/v1/ssg/test` endpoint (future enhancement).
+5. Review SSG sample code references (see inline comments referencing `ssg-wsg/Sample-Codes`).
 
 ## 9. Troubleshooting
-| Symptom | Action |
+| Symptom | Suggested Fix |
 | --- | --- |
-| Backend fails to start | Ensure migrations applied and DB reachable. Run `make migrate`. |
-| `Database connection failed` in preflight | Verify `DATABASE_URL` and network rules. |
-| SSG 401/403 | Credentials expired. Rotate via SSG portal. |
-| SSG 404 | Verify course or run codes exist in SSG. |
-| SSG 409 | Duplicate entry - cross-check local vs SSG state. |
-| SSG 422 | Payload validation failed - inspect logs for field details. |
-| SSG 429 | Rate limited - wait and retry, adjust scheduling. |
-| SSG 5xx | Temporary outage - retry later, queue handles automatic retries. |
-| Frontend blank page | Run `npm run build` or check Vite dev server logs. |
+| API fails to start | Run `make preflight`; confirm Postgres and Redis containers are up. Check `.env` formatting. |
+| DB connection errors | Ensure `DATABASE_URL` points to reachable host and that migrations ran (`alembic upgrade head`). |
+| SSG 401/403 | Credentials invalid or expired. Rotate via SSG portal and update secrets. |
+| SSG 404 | Verify course/run IDs exist in SSG; ensure payload references correct keys. |
+| SSG 409 | Duplicate submission; check idempotency keys and audit logs for earlier success. |
+| SSG 422 | Payload validation failed. Compare against SSG schema and sanitize data (see error catalog). |
+| SSG 429 | Too many requests. Allow the retry policy to back off; avoid manual rapid retries. |
+| SSG 5xx | SSG outage. Jobs will retry automatically; inform staff and continue offline tracking. |
+| Frontend build fails | Delete `frontend/node_modules`, rerun `npm install`. |
 
-Logs default to JSON lines. Pipe into `jq` for filtering: `tail -f backend.log | jq '.event == "ssg_error"'`.
+Logs are written to stdout and should be captured by hosting platform. Include correlation IDs when escalating issues.
 
-## 10. Security & PDPA Summary
-- Role-based access enforced via `X-Role` header or JWT integration.
-- Sensitive identifiers stored hashed. Masked in UI by default.
-- Audit trails log CRUD with actor role.
-- Retention: active learner data retained 5 years post-course, archives purged annually per PDPA guidance.
-- Subject access requests processed by exporting learner profile and attendance within 30 days.
+## 10. Security and PDPA Summary
+- JWT-based RBAC enforces least privilege for Admin, Ops, Trainer, Learner roles.
+- NRIC fields are masked at entry; full NRICs should not be stored.
+- Audit trails capture create/update/delete/access on sensitive entities.
+- Data retention policy suggestions are in `docs/SECURITY-PDPA.md`.
+- Encrypted connections are mandatory (HTTPS in front of the API). Engage PDPA-aware legal counsel before production rollout.
 
-## 11. Support
-- Ops team: ops@hawkerboys.example
-- Engineering: devs@hawkerboys.example
-- Emergency escalation: call duty engineer (see internal roster).
+## 11. Support Contacts
+- **Operations Lead**: ops@hawkerboys.sg
+- **Engineering Volunteers**: dev@hawkerboys.sg
+- **Escalation**: call the Duty Manager when PDPA incidents are suspected.
 
 ## Dev environment
 - We standardize on Node 20 via nvm

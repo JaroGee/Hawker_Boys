@@ -1,55 +1,55 @@
 version: "3.9"
+
 services:
   db:
     image: postgres:15-alpine
     environment:
-      POSTGRES_USER: tms
-      POSTGRES_PASSWORD: tms
-      POSTGRES_DB: tms
+      POSTGRES_DB: tms_db
+      POSTGRES_USER: tms_user
+      POSTGRES_PASSWORD: tms_password
+    ports:
+      - "5432:5432"
     volumes:
       - db_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD", "pg_isready", "-U", "tms"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
 
   redis:
     image: redis:7-alpine
-    command: ["redis-server", "--appendonly", "yes"]
-    volumes:
-      - redis_data:/data
+    ports:
+      - "6379:6379"
 
   backend:
     build:
       context: ..
-      dockerfile: ops/backend.Dockerfile
-    env_file: ../.env
+      dockerfile: ops/dockerfiles/backend.Dockerfile
+    env_file:
+      - ../.env.example
     depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_started
+      - db
+      - redis
     ports:
       - "8000:8000"
 
   worker:
     build:
       context: ..
-      dockerfile: ops/backend.Dockerfile
-    env_file: ../.env
-    command: ["rq", "worker", "ssg-sync"]
+      dockerfile: ops/dockerfiles/backend.Dockerfile
+    command: ["rq", "worker", "ssg_sync"]
+    env_file:
+      - ../.env.example
     depends_on:
       - backend
+      - redis
 
   frontend:
     build:
       context: ..
-      dockerfile: ops/frontend.Dockerfile
-    env_file: ../.env
+      dockerfile: ops/dockerfiles/frontend.Dockerfile
+    env_file:
+      - ../.env.example
+    depends_on:
+      - backend
     ports:
-      - "5173:80"
+      - "5173:4173"
 
 volumes:
   db_data:
-  redis_data:
