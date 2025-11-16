@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from sqlalchemy import text
 
+from tms.infra.config import settings
 from tms.infra.database import SessionLocal
-from tms.settings import settings
 
 
 def check_database() -> None:

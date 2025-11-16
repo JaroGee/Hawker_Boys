@@ -56,6 +56,8 @@ class ClassRunCreate(ClassRunBase):
 
 class ClassRunRead(ClassRunBase):
     id: uuid.UUID
+    course_id: uuid.UUID
+    course_title: str
     status: str
     ssg_run_id: str | None
     created_at: dt.datetime

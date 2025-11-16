@@ -84,6 +84,10 @@ class ClassRun(Base, TimestampMixin):
         Index("ix_class_runs_course_status", "course_id", "status"),
     )
 
+    @property
+    def course_title(self) -> str:
+        return self.course.title if self.course else ""
+
 
 class Session(Base, TimestampMixin):
     __tablename__ = "sessions"

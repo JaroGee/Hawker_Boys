@@ -1,18 +1,21 @@
 from __future__ import annotations
 
 import logging
+import os
 import sys
 from typing import Any
 
 import structlog
 
-from tms.settings import settings
+from tms.infra.config import settings
 
 
 def configure_logging() -> None:
+    log_context = os.getenv("HB_LOG_CONTEXT", "api").upper()
+
     logging.basicConfig(
         level=getattr(logging, settings.log_level.upper(), logging.INFO),
-        format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+        format=f"HB-{log_context} %(asctime)s %(levelname)s [%(name)s] %(message)s",
         stream=sys.stdout,
     )
 

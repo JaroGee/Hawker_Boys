@@ -7,14 +7,21 @@ from fastapi.middleware.cors import CORSMiddleware
 from tms.api.routes import api_router
 from tms.infra.bootstrap import ensure_default_admin
 from tms.infra.config import settings
+from tms.infra.logging import configure_logging
+
+configure_logging()
 
 
 def create_app() -> FastAPI:
     app = FastAPI(title="Hawker Boys TMS", version="0.1.0")
 
+    allowed_origins = {"http://localhost:5173"}
+    if settings.frontend_origin:
+        allowed_origins.add(settings.frontend_origin)
+
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=list(allowed_origins),
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

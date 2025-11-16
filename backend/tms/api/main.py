@@ -3,8 +3,8 @@ from __future__ import annotations
 from fastapi import FastAPI
 
 from tms.api.routers import register_routes
+from tms.infra.config import settings
 from tms.infra.logging import configure_logging
-from tms.settings import settings
 
 configure_logging()
 

@@ -4,6 +4,7 @@ import sys
 
 import httpx
 from loguru import logger
+from redis import Redis
 from sqlalchemy import text
 
 from tms.infra.config import settings
@@ -31,6 +32,11 @@ def check_database() -> None:
         conn.execute(text("SELECT 1"))
 
 
+def check_redis() -> None:
+    client = Redis.from_url(str(settings.redis_url))
+    client.ping()
+
+
 def check_ssg_token() -> None:
     try:
         response = httpx.post(
@@ -54,6 +60,8 @@ def main() -> None:
         logger.info("Environment variables loaded")
         check_database()
         logger.info("Database connectivity OK")
+        check_redis()
+        logger.info("Redis connectivity OK")
         check_ssg_token()
         logger.info("Preflight completed")
     except Exception as exc:  # pragma: no cover - CLI script

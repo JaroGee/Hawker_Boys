@@ -16,15 +16,14 @@ from tms.auth.security import (
 )
 from tms.domain import models
 from tms.infra.database import get_db
-from tms.schemas import Token, UserCreate, UserRead
+from tms.schemas import LoginRequest, Token, UserCreate, UserRead
 
 router = APIRouter()
 
 
-@router.post("/token", response_model=Token)
-def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)) -> Token:
+def _authenticate_user(db: Session, email: str, password: str) -> models.User:
     user = db.execute(
-        models.User.__table__.select().where(models.User.email == form_data.username)
+        models.User.__table__.select().where(models.User.email == email)
     ).mappings().first()
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect credentials")
@@ -32,15 +31,30 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
     db_user = db.get(models.User, uuid.UUID(user["id"]))
     assert db_user is not None  # for type checker
 
-    if not verify_password(form_data.password, db_user.password_hash):
+    if not verify_password(password, db_user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect credentials")
+    return db_user
 
+
+def _issue_token(db: Session, db_user: models.User) -> Token:
     db_user.last_login_at = dt.datetime.utcnow()
     db.commit()
 
     access_token = create_access_token(str(db_user.id), db_user.role.value)
     expires_minutes = int(dt.timedelta(minutes=30).total_seconds())
-    return Token(access_token=access_token, expires_in=expires_minutes)
+    return Token(access_token=access_token, expires_in=expires_minutes, role=db_user.role.value)
+
+
+@router.post("/token", response_model=Token)
+def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)) -> Token:
+    user = _authenticate_user(db, form_data.username, form_data.password)
+    return _issue_token(db, user)
+
+
+@router.post("/login", response_model=Token)
+def login_with_json(payload: LoginRequest, db: Session = Depends(get_db)) -> Token:
+    user = _authenticate_user(db, payload.email, payload.password)
+    return _issue_token(db, user)
 
 
 @router.post("/users", response_model=UserRead, dependencies=[Depends(require_admin)])

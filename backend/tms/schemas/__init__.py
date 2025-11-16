@@ -5,13 +5,14 @@ from .course import (
     ClassRunCreate,
     ClassRunRead,
 )
-from .user import UserCreate, UserRead, Token, TokenPayload
+from .user import UserCreate, UserRead, Token, TokenPayload, LoginRequest
 from .learner import LearnerCreate, LearnerRead
 from .enrollment import EnrollmentCreate, EnrollmentRead, EnrollmentUpdate
 from .attendance import AttendanceCreate, AttendanceRead
 from .assessment import AssessmentCreate, AssessmentRead
 from .certificate import CertificateCreate, CertificateRead
 from .audit import AuditTrailRead
+from .pagination import PaginatedResponse
 
 __all__ = [
     "CourseCreate",
@@ -35,4 +36,6 @@ __all__ = [
     "CertificateCreate",
     "CertificateRead",
     "AuditTrailRead",
+    "PaginatedResponse",
+    "LoginRequest",
 ]

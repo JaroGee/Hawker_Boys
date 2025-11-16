@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     refresh_token_expire_minutes: int = Field(4320, alias="REFRESH_TOKEN_EXPIRE_MINUTES")
     password_hash_scheme: str = Field("bcrypt", alias="PASSWORD_HASH_SCHEME")
     log_level: str = Field("INFO", alias="LOG_LEVEL")
+    frontend_origin: str | None = Field(None, alias="FRONTEND_ORIGIN")
 
     database_url: AnyUrl = Field(..., alias="DATABASE_URL")
 
