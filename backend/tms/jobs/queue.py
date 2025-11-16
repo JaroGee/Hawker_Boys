@@ -11,7 +11,7 @@ from tms.infra.logging import get_logger
 
 logger = get_logger(__name__)
 
-redis_conn = Redis.from_url(settings.redis_url)
+redis_conn = Redis.from_url(str(settings.redis_url))
 queue = rq.Queue(getattr(settings, "rq_default_queue", "ssg-sync"), connection=redis_conn, default_timeout=600)
 
 

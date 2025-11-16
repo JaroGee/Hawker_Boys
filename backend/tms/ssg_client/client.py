@@ -11,6 +11,10 @@ from tms.ssg_client import models
 from tms.ssg_client.endpoints import courses, class_runs, attendance
 
 
+class SSGClientError(Exception):
+    """Raised when the SSG API returns an error."""
+
+
 class SSGClient:
     """Minimal SSG API client inspired by official Sample-Codes repo."""
 
