@@ -38,3 +38,18 @@ backend/tms/migrations/versions/__pycache__/
 
 # Redis dumps
 *.rdb
+# From repo root
+rm -f rebuild_hb_portal.sh
+
+# Add ignores so you never accidentally commit build crap or local DBs
+cat >> .gitignore <<'EOF'
+
+# hb-portal
+hb-portal/node_modules
+hb-portal/.next
+hb-portal/.vite
+hb-portal/dist
+hb-portal/.DS_Store
+
+# local artifacts
+backend/tms.db
