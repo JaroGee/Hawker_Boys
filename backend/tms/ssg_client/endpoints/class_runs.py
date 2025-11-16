@@ -29,5 +29,3 @@ class ClassRunEndpoint:
         response = self.client.request("POST", "/courses/courseRuns", json=payload.__dict__)
         logger.info("Class run %s synced to SSG with status %s", class_run.id, response.status_code)
 
-
-from tms.ssg_client.client import SSGClient  # noqa: E402 circular import guard
