@@ -48,7 +48,7 @@ dev = [
 ]
 
 [tool.setuptools.packages.find]
-where = ["tms"]
+where = ["."]
 
 [tool.black]
 line-length = 88
