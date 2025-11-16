@@ -1,7 +1,11 @@
 from __future__ import annotations
 
-from tms.ssg_client.client import SSGClient
+from typing import TYPE_CHECKING
+
 from tms.ssg_client.models import CourseRunPayload
+
+if TYPE_CHECKING:  # pragma: no cover
+    from tms.ssg_client.client import SSGClient
 
 
 class ClassRunEndpoint:

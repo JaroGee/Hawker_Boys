@@ -1,9 +1,14 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from loguru import logger
 
 from tms.domain import models
 from tms.ssg_client import models as ssg_models
+
+if TYPE_CHECKING:  # pragma: no cover
+    from tms.ssg_client.client import SSGClient
 
 
 class ClassRunEndpoint:
