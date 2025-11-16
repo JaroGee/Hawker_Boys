@@ -49,6 +49,10 @@ select {
   .app-shell {
     grid-template-columns: 1fr;
   }
+
+  .sidebar[data-open='false'] {
+    display: none;
+  }
 }
 
 .sidebar {

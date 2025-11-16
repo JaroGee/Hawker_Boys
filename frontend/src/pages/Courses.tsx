@@ -1,4 +1,4 @@
-import { FormEvent, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { Drawer } from '../components/Drawer';
@@ -36,6 +36,9 @@ const CourseForm = ({
   submitting: boolean;
 }) => {
   const [form, setForm] = useState<CoursePayload>(initialValues);
+  useEffect(() => {
+    setForm(initialValues);
+  }, [initialValues]);
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
     if (!form.code.trim() || !form.title.trim()) return;
@@ -155,7 +158,11 @@ const CoursesPage = () => {
           isOpen
           onClose={() => setDrawer({ mode: 'closed' })}
         >
-          <CourseForm initialValues={emptyPayload} onSubmit={(payload) => createMutation.mutateAsync(payload)} submitting={createMutation.isPending} />
+          <CourseForm
+            initialValues={{ ...emptyPayload }}
+            onSubmit={(payload) => createMutation.mutateAsync(payload)}
+            submitting={createMutation.isPending}
+          />
         </Drawer>
       );
     }
@@ -181,7 +188,13 @@ const CoursesPage = () => {
       );
     }
     return null;
-  }, [drawer, createMutation.isPending, updateMutation.isPending]);
+  }, [
+    drawer,
+    createMutation.isPending,
+    createMutation.mutateAsync,
+    updateMutation.isPending,
+    updateMutation.mutateAsync,
+  ]);
 
   if (coursesQuery.isLoading) return <LoadingState label="Loading courses" />;
   if (coursesQuery.isError)

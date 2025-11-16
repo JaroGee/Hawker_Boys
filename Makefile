@@ -3,6 +3,7 @@ SHELL := /bin/zsh
 PYTHON ?= python3
 PIP ?= pip3
 NPM ?= npm
+COMPOSE ?= docker compose -f ops/docker-compose.yml
 
 .PHONY: preflight node_env venv install-backend install-frontend node_modules backend frontend worker dev migrate lint format seed test
 
@@ -37,12 +38,11 @@ frontend: install-frontend
 worker: install-backend
 	. .venv/bin/activate && rq worker ssg_sync
 
-dev: install-backend install-frontend
-	@echo "Backend: . .venv/bin/activate && uvicorn tms.main:app --app-dir backend --host 0.0.0.0 --port 8000"
-	@if [ -f frontend/package.json ]; then echo "Frontend: cd frontend && $(NPM) run dev"; else echo "No frontend detected"; fi
+dev:
+	$(COMPOSE) --profile dev up api-dev frontend-dev db redis worker
 
-migrate: install-backend
-	. .venv/bin/activate && cd backend && alembic upgrade head
+migrate:
+	$(COMPOSE) exec api alembic upgrade head
 
 lint: install-backend
 	. .venv/bin/activate && ruff check backend/tms
@@ -53,12 +53,12 @@ format: install-backend
 	. .venv/bin/activate && black backend/tms
 	@if [ -f frontend/package.json ]; then cd frontend && $(NPM) run lint -- --fix; fi
 
-seed: install-backend
-	. .venv/bin/activate && python backend/tms/scripts/seed.py
+seed:
+	$(COMPOSE) exec api python -m tms.scripts.seed
 
 test: install-backend
-        . .venv/bin/activate && pytest backend/tests
-        @if [ -f frontend/package.json ]; then cd frontend && $(NPM) test || true; fi
+	. .venv/bin/activate && pytest backend/tests
+	@if [ -f frontend/package.json ]; then cd frontend && $(NPM) test || true; fi
 
 .PHONY: portal-dev portal-build portal-start portal-seed
 

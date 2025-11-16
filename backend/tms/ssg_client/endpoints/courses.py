@@ -1,9 +1,14 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from loguru import logger
 
 from tms.domain import models
 from tms.ssg_client import models as ssg_models
+
+if TYPE_CHECKING:  # pragma: no cover - type hints only
+    from tms.ssg_client.client import SSGClient
 
 
 class CourseEndpoint:
@@ -22,5 +27,3 @@ class CourseEndpoint:
         response = self.client.request("POST", "/courses", json=payload.__dict__)
         logger.info("Course %s synced to SSG with status %s", course.id, response.status_code)
 
-
-from tms.ssg_client.client import SSGClient  # noqa: E402 circular import guard

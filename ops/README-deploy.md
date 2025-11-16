@@ -1,70 +1,88 @@
-# Deployment Guide
+# Render Deployment Guide
 
-## 1. Prerequisites
-- Docker 24+
-- Access to container registry (e.g., GitHub Container Registry).
-- Provisioned PostgreSQL 15+ and Redis 7 instances in Singapore region.
-- SSG sandbox credentials stored securely.
+The stack ships as three Render services (API, worker, and static frontend) plus managed Postgres and Redis. Complete the following steps to get a smoke deployment in under 30 minutes.
 
-## 2. Local Validation
-1. Copy `.env.example` to `.env` and populate secrets.
-2. Run `make preflight` to ensure DB, Redis, and SSG credentials are reachable.
-3. Execute `make test` to confirm unit tests and linting pass.
+## 1. Prepare configuration
 
-## 3. Container Build and Push
-```bash
-# Backend
-DOCKER_IMAGE=ghcr.io/hawker-boys/tms-backend:$(git rev-parse --short HEAD)
-docker build -f ops/dockerfiles/backend.Dockerfile -t "$DOCKER_IMAGE" .
-docker push "$DOCKER_IMAGE"
+1. Copy `.env.example` to `.env` and populate **all** required values (secrets, SSG credentials, `FRONTEND_ORIGIN`, etc.).
+2. Run `make preflight && make test` locally. Fix any failures before deploying.
+3. Build the production bundles once (optional sanity check):
+   ```bash
+   docker compose -f ops/docker-compose.yml up --build api worker frontend db redis
+   ```
 
-# Frontend
-FRONTEND_IMAGE=ghcr.io/hawker-boys/tms-frontend:$(git rev-parse --short HEAD)
-docker build -f ops/dockerfiles/frontend.Dockerfile -t "$FRONTEND_IMAGE" .
-docker push "$FRONTEND_IMAGE"
-```
+## 2. Provision managed services on Render
 
-## 4. Railway Deployment Steps
-1. Create new PostgreSQL and Redis services.
-2. Add a service for backend using Docker image above, configure environment variables, set health checks `/healthz`.
-3. Add a worker service running `rq worker ssg_sync` with same image.
-4. Deploy frontend using static site (upload `frontend/dist`).
-5. Configure custom domain with HTTPS.
+1. **Managed Postgres**: PostgreSQL 15 in the Singapore region. Note the internal database URL and set it later as `DATABASE_URL`.
+2. **Managed Redis**: Redis 7 instance. Capture the Redis URL for `REDIS_URL`.
 
-## 5. Render Deployment Steps
-1. Create Render Postgres and Redis.
-2. Deploy backend as Web Service with start command `uvicorn tms.main:app --host 0.0.0.0 --port 8000`.
-3. Configure environment variables and secrets.
-4. Add Background Worker with command `rq worker ssg_sync`.
-5. Deploy frontend as Static Site with build command `npm install && npm run build`, publish `frontend/dist`.
+## 3. Backend Web Service
 
-## 6. AWS Lightsail Blueprint
-1. Provision Lightsail container service in ap-southeast-1.
-2. Build and push backend + worker images, deploy as separate containers.
-3. Use Lightsail managed database for PostgreSQL, attach private networking.
-4. Configure HTTPS via Lightsail Load Balancer and attach backend container.
-5. Schedule nightly snapshots for disaster recovery.
+| Setting | Value |
+| --- | --- |
+| Runtime | Docker |
+| Start command | `uvicorn tms.main:app --host 0.0.0.0 --port 8000` |
+| Health checks | HTTP on `/healthz` (startup) and `/readiness` (steady state) |
 
-## 7. Backup & Restore Procedures
-- **Backup**: `pg_dump --no-owner --format=custom $DATABASE_URL > backup_$(date +%F).dump`
-- **Restore**:
-  ```bash
-  pg_restore --clean --no-owner --dbname=$DATABASE_URL backup_xx.dump
-  ```
-- Store backups on encrypted S3 bucket or Railway storage with lifecycle policies.
+Environment variables to include:
 
-## 8. Preflight Checklist (make preflight)
-- Validates presence of mandatory environment variables.
-- Confirms PostgreSQL connectivity and pending migrations.
-- Checks Redis queue availability.
-- Attempts OAuth token request to SSG sandbox (skipped if offline flag set).
+- `DATABASE_URL` → Render Postgres URL
+- `REDIS_URL` → Render Redis URL
+- `FRONTEND_ORIGIN` → your frontend hostname (e.g. `https://tms.hawkerboys.com`)
+- `SECRET_KEY`, `SSG_*`, `DEFAULT_ADMIN_*`, and the remaining keys from `.env.example`
 
-## 9. Rollback Strategy
-- Keep previous container images tagged and available.
-- Maintain last known good database snapshot.
-- If deployment fails, redeploy prior image and restore snapshot if schema changes occurred.
+Enable auto-redeploy on image push or Git commits as desired.
 
-## 10. Post-Deployment Verification
-- Hit `/healthz` and `/readiness` endpoints.
-- Login via admin UI and verify course creation works end-to-end.
-- Confirm background worker processes a test sync job without errors.
+## 4. Background Worker
+
+Create a second Docker service from the same repository/image.
+
+| Setting | Value |
+| --- | --- |
+| Start command | `rq worker ssg-sync` |
+| Environment | Reuse the exact variable set from the web service |
+
+This worker consumes the Redis queue used by SSG sync jobs.
+
+## 5. Static Frontend
+
+Use Render Static Sites pointed at `/frontend`.
+
+| Setting | Value |
+| --- | --- |
+| Build command | `npm ci && npm run build` |
+| Publish directory | `dist` |
+| Environment variables | `VITE_API_URL=https://<backend-host>/api` (match your API URL) |
+
+Upload the favicon and apple-touch icons packaged under `frontend/public`. Configure the custom domain and ensure HTTPS is enabled.
+
+## 6. Environment variable checklist
+
+Required keys (see `.env.example` for defaults):
+
+- `APP_ENV`
+- `API_HOST`, `API_PORT`
+- `SECRET_KEY`
+- `ACCESS_TOKEN_EXPIRE_MINUTES`
+- `REFRESH_TOKEN_EXPIRE_MINUTES`
+- `PASSWORD_HASH_SCHEME`
+- `FRONTEND_ORIGIN`
+- `DATABASE_URL`
+- `REDIS_URL`
+- `RQ_DEFAULT_QUEUE`
+- `SSG_BASE_URL`, `SSG_CLIENT_ID`, `SSG_CLIENT_SECRET`, `SSG_WEBHOOK_SECRET`, `SSG_ENV`
+- `DEFAULT_ADMIN_EMAIL`, `DEFAULT_ADMIN_PASSWORD`
+- `SENTRY_DSN` (optional)
+
+## 7. Post-deploy checks
+
+1. `curl https://<backend-host>/healthz` and `/readiness` should return HTTP 200.
+2. Visit the frontend, sign in with the default admin credentials, and confirm the dashboard renders.
+3. Create a course, verify it appears on the `/courses` page, and ensure a row is appended to `/v1/audit`.
+4. Hit `POST /ssg/test-webhook` with the configured secret to confirm the security check.
+
+## 8. Rollback
+
+- Keep the previous backend Docker image tag. If needed, redeploy it via Render’s rollback UI.
+- Restore the latest Postgres snapshot before rerunning migrations.
+- If the worker misbehaves, scale it down to 0 replicas while the API stays online, then redeploy.

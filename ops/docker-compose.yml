@@ -2,7 +2,7 @@ version: "3.9"
 
 services:
   db:
-    image: postgres:15-alpine
+    image: postgres:15
     environment:
       POSTGRES_DB: tms_db
       POSTGRES_USER: tms_user
@@ -11,21 +11,36 @@ services:
       - "5432:5432"
     volumes:
       - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tms_user -d tms_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   redis:
     image: redis:7-alpine
     ports:
       - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-  backend:
+  api:
     build:
       context: ..
       dockerfile: ops/dockerfiles/backend.Dockerfile
     env_file:
-      - ../.env.example
+      - ../.env
+    environment:
+      DATABASE_URL: postgresql+psycopg://tms_user:tms_password@db:5432/tms_db
+      REDIS_URL: redis://redis:6379/0
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     ports:
       - "8000:8000"
 
@@ -33,23 +48,69 @@ services:
     build:
       context: ..
       dockerfile: ops/dockerfiles/backend.Dockerfile
-    command: ["rq", "worker", "ssg_sync"]
+    command: ["rq", "worker", "ssg-sync"]
     env_file:
-      - ../.env.example
+      - ../.env
+    environment:
+      DATABASE_URL: postgresql+psycopg://tms_user:tms_password@db:5432/tms_db
+      REDIS_URL: redis://redis:6379/0
+      HB_LOG_CONTEXT: worker
     depends_on:
-      - backend
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
   frontend:
     build:
       context: ..
       dockerfile: ops/dockerfiles/frontend.Dockerfile
     env_file:
-      - ../.env.example
+      - ../.env
     depends_on:
-      - backend
+      api:
+        condition: service_started
     ports:
-      - "5173:4173"
+      - "80:80"
+
+  api-dev:
+    profiles: ["dev"]
+    build:
+      context: ..
+      dockerfile: ops/dockerfiles/backend.Dockerfile
+    command: ["uvicorn", "tms.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    env_file:
+      - ../.env
+    environment:
+      DATABASE_URL: postgresql+psycopg://tms_user:tms_password@db:5432/tms_db
+      REDIS_URL: redis://redis:6379/0
+      HB_LOG_CONTEXT: api-dev
+    volumes:
+      - ../backend:/app
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+
+  frontend-dev:
+    profiles: ["dev"]
+    image: node:20
+    working_dir: /workspace
+    command: ["sh", "-c", "npm install && npm run dev -- --host 0.0.0.0 --port 5173"]
+    environment:
+      VITE_API_URL: http://api-dev:8000/api
+    volumes:
+      - ../frontend:/workspace
+      - frontend_node_modules:/workspace/node_modules
+    depends_on:
+      api-dev:
+        condition: service_started
+    ports:
+      - "5173:5173"
 
 volumes:
   db_data:
+  frontend_node_modules:
