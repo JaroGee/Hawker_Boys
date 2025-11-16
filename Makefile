@@ -21,7 +21,7 @@ venv:
 	[ -d .venv ] || $(PYTHON) -m venv .venv
 
 install-backend: venv
-	. .venv/bin/activate && pip install -e backend/.[dev]
+	. .venv/bin/activate && pip install -e 'backend/.[dev]'
 
 install-frontend:
 	@if [ -f frontend/package.json ]; then cd frontend && $(NPM) install; \
