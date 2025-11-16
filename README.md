@@ -18,6 +18,10 @@ The Hawker Boys TMS is a secure, PDPA-aware platform for managing training progr
    - Run `make preflight` before deployment to validate environment variables, database connectivity, pending migrations, and Redis availability.
 5. **Deployment**
    - Follow `docs/README.md` and `ops/README-deploy.md` for step-by-step guidance covering Render, Railway, and AWS Lightsail paths.
+6. **Portal (Next.js) development**
+   - All portal source files live under `hb-portal/`.
+   - Copy `hb-portal/.env.example` to `.env` and install deps with `cd hb-portal && npm install`.
+   - Use the root make targets `portal-dev`, `portal-build`, `portal-start`, and `portal-seed` for common workflows.
 
 ### Helpful make targets
 - `make backend` – run FastAPI locally.

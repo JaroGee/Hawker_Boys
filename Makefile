@@ -57,5 +57,19 @@ seed: install-backend
 	. .venv/bin/activate && python backend/tms/scripts/seed.py
 
 test: install-backend
-	. .venv/bin/activate && pytest backend/tests
-	@if [ -f frontend/package.json ]; then cd frontend && $(NPM) test || true; fi
+        . .venv/bin/activate && pytest backend/tests
+        @if [ -f frontend/package.json ]; then cd frontend && $(NPM) test || true; fi
+
+.PHONY: portal-dev portal-build portal-start portal-seed
+
+portal-dev:
+	cd hb-portal && $(NPM) run dev
+
+portal-build:
+	cd hb-portal && $(NPM) run build
+
+portal-start:
+	cd hb-portal && $(NPM) run start
+
+portal-seed:
+	cd hb-portal && $(NPM) run db:seed
