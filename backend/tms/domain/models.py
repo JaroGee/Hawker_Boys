@@ -11,16 +11,24 @@ from sqlalchemy import (
     DateTime,
     Enum as SQLEnum,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
     UniqueConstraint,
-    Index,
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from tms.infra.database import Base
+
+
+def _enum_values(enum_cls: type[PyEnum]) -> list[str]:
+    return [member.value for member in enum_cls]
+
+
+def str_enum(enum_cls: type[PyEnum]) -> SQLEnum:
+    return SQLEnum(enum_cls, name=enum_cls.__name__.lower(), values_callable=_enum_values)
 
 
 class TimestampMixin:
@@ -76,7 +84,7 @@ class ClassRun(Base, TimestampMixin):
     start_date: Mapped[dt.date] = mapped_column(Date, nullable=False)
     end_date: Mapped[dt.date] = mapped_column(Date, nullable=False)
     status: Mapped[ClassRunStatusEnum] = mapped_column(
-        SQLEnum(ClassRunStatusEnum), default=ClassRunStatusEnum.DRAFT
+        str_enum(ClassRunStatusEnum), default=ClassRunStatusEnum.DRAFT
     )
     ssg_run_id: Mapped[str | None] = mapped_column(String(100), index=True)
 
@@ -124,7 +132,7 @@ class User(Base, TimestampMixin):
     email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
     full_name: Mapped[str] = mapped_column(String(255), nullable=False)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
-    role: Mapped[UserRoleEnum] = mapped_column(SQLEnum(UserRoleEnum), nullable=False)
+    role: Mapped[UserRoleEnum] = mapped_column(str_enum(UserRoleEnum), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     last_login_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
 
@@ -182,7 +190,7 @@ class Enrollment(Base, TimestampMixin):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     learner_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("learners.id", ondelete="CASCADE"), nullable=False)
     class_run_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("class_runs.id", ondelete="CASCADE"), nullable=False)
-    status: Mapped[EnrollmentStatusEnum] = mapped_column(SQLEnum(EnrollmentStatusEnum), nullable=False)
+    status: Mapped[EnrollmentStatusEnum] = mapped_column(str_enum(EnrollmentStatusEnum), nullable=False)
     enrollment_date: Mapped[dt.date] = mapped_column(Date, default=dt.date.today)
     ssg_enrollment_id: Mapped[str | None] = mapped_column(String(100), index=True)
 
@@ -207,7 +215,7 @@ class Attendance(Base, TimestampMixin):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     enrollment_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("enrollments.id", ondelete="CASCADE"), nullable=False)
     session_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("sessions.id", ondelete="CASCADE"), nullable=False)
-    status: Mapped[AttendanceStatusEnum] = mapped_column(SQLEnum(AttendanceStatusEnum), nullable=False)
+    status: Mapped[AttendanceStatusEnum] = mapped_column(str_enum(AttendanceStatusEnum), nullable=False)
     remarks: Mapped[str | None] = mapped_column(Text)
     submitted_to_ssg: Mapped[bool] = mapped_column(Boolean, default=False)
 
@@ -255,7 +263,7 @@ class AuditTrail(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     performed_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), index=True)
-    action: Mapped[AuditActionEnum] = mapped_column(SQLEnum(AuditActionEnum), nullable=False)
+    action: Mapped[AuditActionEnum] = mapped_column(str_enum(AuditActionEnum), nullable=False)
     entity_type: Mapped[str] = mapped_column(String(100), nullable=False)
     entity_id: Mapped[str] = mapped_column(String(100), nullable=False)
     timestamp: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=dt.datetime.utcnow)
