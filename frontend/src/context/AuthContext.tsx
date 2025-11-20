@@ -60,6 +60,7 @@ export const AuthProvider = ({ children }: Props) => {
 
   const hydrateAfterLogin = async (tokenResponse: TokenResponse, remember: boolean) => {
     setToken(tokenResponse.access_token);
+    authStorage.storeToken(tokenResponse.access_token, remember);
     const profileResponse = await meRequest();
     authStorage.persistSession(tokenResponse.access_token, profileResponse.data, remember);
     setProfile(profileResponse.data);

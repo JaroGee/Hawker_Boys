@@ -3,8 +3,9 @@ from __future__ import annotations
 import datetime as dt
 import uuid
 
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 
+from .types import LocalEmailStr
 
 class Token(BaseModel):
     access_token: str
@@ -20,12 +21,12 @@ class TokenPayload(BaseModel):
 
 
 class LoginRequest(BaseModel):
-    email: EmailStr
+    email: LocalEmailStr
     password: str
 
 
 class UserBase(BaseModel):
-    email: EmailStr
+    email: LocalEmailStr
     full_name: str
 
 

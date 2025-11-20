@@ -29,17 +29,27 @@ const removeFromStores = (key: string) => {
 
 export const authStorage = {
   persistSession(token: string, profile: UserProfile, remember: boolean) {
-    const target = remember ? local : session;
+    const target = authStorage.storeToken(token, remember);
     if (!target) return;
-    removeFromStores(TOKEN_KEY);
     removeFromStores(PROFILE_KEY);
-    target.setItem(TOKEN_KEY, token);
     target.setItem(PROFILE_KEY, JSON.stringify(profile));
     if (remember) {
       local?.setItem(REMEMBER_KEY, '1');
     } else {
       local?.removeItem(REMEMBER_KEY);
     }
+  },
+  storeToken(token: string, remember: boolean) {
+    const target = remember ? local : session;
+    if (!target) return null;
+    removeFromStores(TOKEN_KEY);
+    target.setItem(TOKEN_KEY, token);
+    if (remember) {
+      local?.setItem(REMEMBER_KEY, '1');
+    } else {
+      local?.removeItem(REMEMBER_KEY);
+    }
+    return target;
   },
   getToken(): string | null {
     return getFromStores(TOKEN_KEY);

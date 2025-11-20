@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import datetime as dt
-import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
@@ -28,7 +27,7 @@ def _authenticate_user(db: Session, email: str, password: str) -> models.User:
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect credentials")
 
-    db_user = db.get(models.User, uuid.UUID(user["id"]))
+    db_user = db.get(models.User, user["id"])
     assert db_user is not None  # for type checker
 
     if not verify_password(password, db_user.password_hash):
