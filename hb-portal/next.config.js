@@ -1,6 +1,6 @@
-import { createSecureHeaders } from 'next-safe';
+const nextSafe = require('next-safe');
 
-const securityHeaders = createSecureHeaders({
+const securityHeaders = nextSafe({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
@@ -13,13 +13,13 @@ const securityHeaders = createSecureHeaders({
       baseUri: ["'self'"],
       formAction: ["'self'"]
     }
-  }
+  },
+  isDev: process.env.NODE_ENV !== 'production'
 });
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   experimental: {
-    serverActions: true,
     typedRoutes: true
   },
   images: {
@@ -40,4 +40,4 @@ const nextConfig = {
   }
 };
 
-export default nextConfig;
+module.exports = nextConfig;

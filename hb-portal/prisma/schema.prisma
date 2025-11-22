@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
+  shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
 }
 
 enum Role {
@@ -68,6 +69,7 @@ model User {
   employer     EmployerProfile?
   assessments  Assessment[] @relation("MentorAssessments")
   supportTickets SupportTicket[] @relation("SupportResponder")
+  liveLocationRequests LiveLocationSession[] @relation("RequestedByUser")
 }
 
 model TraineeProfile {
@@ -93,7 +95,6 @@ model MentorProfile {
   userId String @id
   user   User   @relation(fields: [userId], references: [id])
   bio    String?
-  trainees Assessment[] @relation("MentorAssessments")
 }
 
 model EmployerProfile {
@@ -268,7 +269,7 @@ model LiveLocationSession {
   trainee          TraineeProfile @relation(fields: [traineeId], references: [userId])
   token            String   @unique
   requestedByUserId String
-  requestedBy      User     @relation(fields: [requestedByUserId], references: [id])
+  requestedBy      User     @relation("RequestedByUser", fields: [requestedByUserId], references: [id])
   expiresAt        DateTime
   active           Boolean @default(false)
   pings            LiveLocationPing[]

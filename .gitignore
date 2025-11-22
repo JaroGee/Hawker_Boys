@@ -28,6 +28,7 @@ npm-debug.log*
 yarn.lock
 pnpm-lock.yaml
 hb-portal/.uploads/
+hb-portal/.next/
 
 # Editors
 .idea/
