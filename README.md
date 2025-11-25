@@ -30,6 +30,13 @@ The Hawker Boys TMS is a secure, PDPA-aware platform for managing training progr
 - `make migrate` – apply Alembic migrations.
 - `make preflight` – verify environment readiness.
 
+## Streamlit admin console
+- Install deps with `python3 -m pip install -r streamlit_app/requirements.txt` (use the existing venv).
+- Ensure the API is running (`make dev` or `make backend`) and reachable at `http://localhost:8000/api` or set `TMS_API_URL` to another base.
+- Launch the UI via `streamlit run streamlit_app/app.py` from the repo root.
+- Sign in with your TMS credentials (defaults from `.env.example` are prefilled for convenience).
+- The sidebar lets you adjust the API base URL if you are pointing at a remote instance.
+
 ### Environment notes
 - `.env` drives configuration via Pydantic settings.
 - PostgreSQL is recommended; SQLite only for quick smoke tests.
