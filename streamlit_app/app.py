@@ -151,10 +151,10 @@ def dashboard_page() -> None:
 
     metrics = []
     for label, endpoint in [
-        ("Courses", "/v1/courses"),
-        ("Learners", "/v1/learners"),
-        ("Enrollments", "/v1/enrollments"),
-        ("Attendance records", "/v1/attendance"),
+        ("Courses", "/v1/courses/"),
+        ("Learners", "/v1/learners/"),
+        ("Enrollments", "/v1/enrollments/"),
+        ("Attendance records", "/v1/attendance/"),
     ]:
         data = api_json("get", endpoint, params={"page_size": 1})
         metrics.append((label, data["total"] if data else None))
@@ -164,7 +164,7 @@ def dashboard_page() -> None:
         col.metric(label, "—" if value is None else f"{value:,}")
 
     st.subheader("Recent operator activity")
-    audit = api_json("get", "/v1/audit", params={"page_size": 6})
+    audit = api_json("get", "/v1/audit/", params={"page_size": 6})
     if audit and audit.get("items"):
         rows = [
             {
@@ -180,14 +180,14 @@ def dashboard_page() -> None:
 
 
 def fetch_course_options(limit: int = 100) -> list[dict[str, str]]:
-    data = api_json("get", "/v1/courses", params={"page_size": limit})
+    data = api_json("get", "/v1/courses/", params={"page_size": limit})
     if not data:
         return []
     return [{"id": item["id"], "label": f"{item['code']} — {item['title']}"} for item in data.get("items", [])]
 
 
 def fetch_run_options(limit: int = 100) -> list[dict[str, str]]:
-    data = api_json("get", "/v1/class-runs", params={"page_size": limit})
+    data = api_json("get", "/v1/class-runs/", params={"page_size": limit})
     if not data:
         return []
     return [
@@ -200,7 +200,7 @@ def fetch_run_options(limit: int = 100) -> list[dict[str, str]]:
 
 
 def fetch_learner_options(limit: int = 100) -> list[dict[str, str]]:
-    data = api_json("get", "/v1/learners", params={"page_size": limit})
+    data = api_json("get", "/v1/learners/", params={"page_size": limit})
     if not data:
         return []
     return [
@@ -220,7 +220,7 @@ def courses_runs_page() -> None:
     with courses_tab:
         search = st.text_input("Search by code or title", key="courses_search")
         page = st.session_state.get("courses_page", 1)
-        data = api_json("get", "/v1/courses", params={"q": search or None, "page": page, "page_size": 10})
+        data = api_json("get", "/v1/courses/", params={"q": search or None, "page": page, "page_size": 10})
 
         st.write(f"Total courses: {data.get('total', 0) if data else 0}")
         if data and data.get("items"):
@@ -282,7 +282,7 @@ def courses_runs_page() -> None:
     with runs_tab:
         search = st.text_input("Filter by reference or course", key="runs_search")
         page = st.session_state.get("runs_page", 1)
-        data = api_json("get", "/v1/class-runs", params={"q": search or None, "page": page, "page_size": 10})
+        data = api_json("get", "/v1/class-runs/", params={"q": search or None, "page": page, "page_size": 10})
 
         st.write(f"Total class runs: {data.get('total', 0) if data else 0}")
         if data and data.get("items"):
@@ -349,7 +349,7 @@ def learners_page() -> None:
 
     search = st.text_input("Search by name or NRIC", key="learners_search")
     page = st.session_state.get("learners_page", 1)
-    data = api_json("get", "/v1/learners", params={"q": search or None, "page": page, "page_size": 10})
+    data = api_json("get", "/v1/learners/", params={"q": search or None, "page": page, "page_size": 10})
 
     st.write(f"Total learners: {data.get('total', 0) if data else 0}")
     if data and data.get("items"):
@@ -409,7 +409,7 @@ def enrollments_page() -> None:
 
     search = st.text_input("Search by learner or class", key="enrollments_search")
     page = st.session_state.get("enrollments_page", 1)
-    data = api_json("get", "/v1/enrollments", params={"q": search or None, "page": page, "page_size": 10})
+    data = api_json("get", "/v1/enrollments/", params={"q": search or None, "page": page, "page_size": 10})
 
     st.write(f"Total enrollments: {data.get('total', 0) if data else 0}")
     if data and data.get("items"):
@@ -472,7 +472,7 @@ def attendance_page() -> None:
 
     search = st.text_input("Search by enrollment or session", key="attendance_search")
     page = st.session_state.get("attendance_page", 1)
-    data = api_json("get", "/v1/attendance", params={"q": search or None, "page": page, "page_size": 10})
+    data = api_json("get", "/v1/attendance/", params={"q": search or None, "page": page, "page_size": 10})
 
     st.write(f"Total attendance records: {data.get('total', 0) if data else 0}")
     if data and data.get("items"):
