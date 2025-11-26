@@ -105,10 +105,14 @@ def render_sidebar() -> str:
 
     if st.session_state.get("profile"):
         profile = st.session_state["profile"]
+        allowed_nav = ["Dashboard", "Courses & runs", "Learners", "Enrollments", "Attendance"]
+        # If we previously stored a different nav (e.g. Login), reset to a safe default.
+        if st.session_state.get("nav") not in allowed_nav:
+            st.session_state["nav"] = allowed_nav[0]
         st.sidebar.success(f"{profile['full_name']} ({profile['role']})")
         nav = st.sidebar.radio(
             "Navigation",
-            ["Dashboard", "Courses & runs", "Learners", "Enrollments", "Attendance"],
+            allowed_nav,
             key="nav",
         )
         if st.sidebar.button("Sign out"):
